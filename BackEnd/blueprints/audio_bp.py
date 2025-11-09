@@ -76,12 +76,14 @@ def upload_signal():
             'Fs': Fs,
             'duration': len(signal_time_series) / Fs,
             'data': {
-                'time_series_chunk': signal_time_series[::sample_step].tolist(),
+                'full_time_series': signal_time_series.tolist(), # <-- UPDATED TO SEND FULL ARRAY
                 'frequencies': frequencies.tolist(),
                 'magnitudes_db': magnitudes_db.tolist(),
                 'spectrogram_data': spectrogram_matrix.tolist()
             }
         }), 200
+    
+    
 
     except Exception as e:
         print(f"Server error during upload: {e}")

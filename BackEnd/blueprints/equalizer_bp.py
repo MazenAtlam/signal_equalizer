@@ -31,7 +31,7 @@ def generate_viz_data(time_series, Fs, fft_data_full):
     return {
         'new_magnitudes_db': magnitudes_db.tolist(),
         'spectrogram_data': spectrogram_matrix.tolist(),
-        'time_series_chunk': time_series[::sample_step].tolist(),
+        'full_time_series': time_series.tolist(), # <-- UPDATED TO SEND FULL ARRAY
     }
 
 
