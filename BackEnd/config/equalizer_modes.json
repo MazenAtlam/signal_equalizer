@@ -1,0 +1,43 @@
+{
+  "generic": {
+    "label": "Generic Mode",
+    "description": "User-defined arbitrary bands.",
+    "bands": [
+      {
+        "label": "Generic Band 1",
+        "freq_start_hz": 20,
+        "freq_end_hz": 1000,
+        "scale_factor": 1.0
+      }
+    ]
+  },
+  "musical": {
+    "label": "Musical Instruments Mode",
+    "description": "Bands optimized for music mixing.",
+    "bands": [
+      {"label": "Bass (20-250 Hz)", "freq_start_hz": 20, "freq_end_hz": 250, "scale_factor": 1.0},
+      {"label": "Vocals/Mid (250-4k Hz)", "freq_start_hz": 250, "freq_end_hz": 4000, "scale_factor": 1.0},
+      {"label": "Treble (4k-20k Hz)", "freq_start_hz": 4000, "freq_end_hz": 20000, "scale_factor": 1.0}
+    ]
+  },
+  "animal": {
+    "label": "Animal Sounds Mode",
+    "description": "Bands isolating sounds for four different animals.",
+    "bands": [
+      {"label": "Lion (50-250 Hz)", "freq_start_hz": 50, "freq_end_hz": 250, "scale_factor": 1.0},
+      {"label": "Cat (300-2000 Hz)", "freq_start_hz": 300, "freq_end_hz": 2000, "scale_factor": 1.0},
+      {"label": "Giraffe (10-50 Hz)", "freq_start_hz": 10, "freq_end_hz": 50, "scale_factor": 1.0},
+      {"label": "Bat (10k-20k Hz)", "freq_start_hz": 10000, "freq_end_hz": 20000, "scale_factor": 1.0}
+    ]
+  },
+  "voices": {
+    "label": "Human Voices Mode",
+    "description": "Bands isolating different voice characteristics.",
+    "bands": [
+      {"label": "Male Low Freqs (85-300 Hz)", "freq_start_hz": 85, "freq_end_hz": 300, "scale_factor": 1.0},
+      {"label": "Female Freqs (165-400 Hz)", "freq_start_hz": 165, "freq_end_hz": 400, "scale_factor": 1.0},
+      {"label": "Arabic Consonants (1.5k-5k Hz)", "freq_start_hz": 1500, "freq_end_hz": 5000, "scale_factor": 1.0},
+      {"label": "English Vowels (500-2000 Hz)", "freq_start_hz": 500, "freq_end_hz": 2000, "scale_factor": 1.0}
+    ]
+  }
+}
