@@ -35,8 +35,3 @@ def load_audio_to_numpy(filepath):
 def save_numpy_to_wav(signal_float, Fs, filepath):
     """ Saves a normalized float NumPy array to a WAV file using soundfile. """
     sf.write(filepath, signal_float, Fs, format='WAV', subtype='PCM_16')
-
-# Placeholder for final equalizer core (needed for the next step)
-def apply_equalization_scheme(fft_data, Fs, equalization_scheme):
-    # This function will be implemented in Step 8
-    pass
