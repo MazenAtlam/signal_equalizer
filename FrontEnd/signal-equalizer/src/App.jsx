@@ -1,7 +1,13 @@
-import Navbar from "./Components/Navbar";
+import React from "react";
+import GenericMode from "../src/Components/GenericMode";
+import "../styles/App.css";
 
 function App() {
-  return <Navbar />;
+  return (
+    <div className="App">
+      <GenericMode />
+    </div>
+  );
 }
 
 export default App;

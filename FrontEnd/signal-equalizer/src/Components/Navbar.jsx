@@ -1,49 +1,64 @@
-import GeneralBtn from "./GeneralBtn";
+// Navbar.jsx
+import Button from "./Button";
 
-export default function Navbar() {
+const Navbar = () => {
   return (
-    <div
-      className="navContainer pt-4 py-3 d-flex justify-content-between px-5"
-      style={{ backgroundColor: "#1A1D23" }}
-    >
-      <div
-        className="logo my-auto d-flex"
-        style={{ fontSize: "25px", color: "white", fontWeight: "700" }}
-      >
+    <div className="equalizer-navbar px-5">
+      <div className="navbar-brand">
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="32"
-          height="32"
+          width="24"
+          height="24"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#D5A424"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="lucide lucide-chart-column h-6 w-6 text-amber-400"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="navbar-icon"
         >
           <path d="M3 3v16a2 2 0 0 0 2 2h16"></path>
           <path d="M18 17V9"></path>
           <path d="M13 17V5"></path>
           <path d="M8 17v-3"></path>
-        </svg>{" "}
-        <h1
-          className="h3 mx-3 fw-bold pb-1"
+        </svg>
+        <h1 className="text-2xl font-bold gradient-text">Signal Equalizer</h1>
+      </div>
+      <div className="d-flex align-items-center gap-3">
+        <Button
+          variant="secondary"
+          size="lg"
           style={{
-            background: "linear-gradient(to right, #1FD5F9, #7837baff)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-            color: "transparent",
+            backgroundColor: "#1FD5F9",
+            border: "1px solid transparent",
+            borderRadius: "4px",
+            color: "#000000",
+            paddingTop: "0.3rem",
+            paddingBottom: "0.3rem",
+            fontWeight: "600",
+            fontSize: "0.875rem",
           }}
         >
-          Signal Equalizer
-        </h1>
-      </div>
-      <div className="modes mb-2">
-        <GeneralBtn text={`Generic Mode`} />
-        <GeneralBtn text={`Customized Mode`} />
+          Generic Mode
+        </Button>
+        <Button
+          size="lg"
+          style={{
+            backgroundColor: "#2A2E36 !important",
+            border: "1px solid #3A3E46",
+            borderRadius: "4px",
+            color: "#FFFFFF",
+            paddingTop: "0.3rem",
+            paddingBottom: "0.3rem",
+            fontWeight: "600",
+            fontSize: "0.875rem",
+          }}
+        >
+          Customized Mode
+        </Button>
       </div>
     </div>
   );
-}
+};
+
+export default Navbar;
