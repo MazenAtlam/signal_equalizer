@@ -1,0 +1,21 @@
+.btn{
+    padding: 9px 14px;
+    background-color: transparent;
+    margin: 0px 10px;
+    cursor: pointer;
+    border: none;
+    font-size: 14px;
+    font-weight: 500;
+}
+.blue-style{
+    background-color: #1FD5F9;
+    color: #000000;
+}
+.normal-style{
+    background-color: #000000;
+    color: #FFFFFF;
+}
+.green-style{
+    background-color: #00FF00;
+    color: #000000;
+}
