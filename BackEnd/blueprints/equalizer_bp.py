@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app, send_from_directory
 import os, sys
 import numpy as np
 
@@ -11,8 +11,8 @@ sys.path.append(os.path.join(BASE_DIR, 'utils'))
 from blueprints.audio_bp import SIGNAL_CACHE
 from custom_fft import custom_ifft, get_fft_components
 from spectrogram import custom_spectrogram
-from equalizer_core import apply_equalization 
-
+from equalizer_core import apply_equalization
+from ai_separator import run_demucs_separation, run_speechbrain_separation, save_signal_to_temp
 equalizer_bp = Blueprint('equalizer_bp', __name__)
 
 # --- Helper to generate common response data (prevents code repetition) ---
@@ -141,3 +141,91 @@ def set_visualization_scale():
         'message': f"Scale set to {scale_type}.",
         'new_frequencies': new_frequencies
     }), 200
+
+
+# --- NEW ENDPOINT 1: /api/equalizer/separate_ai (POST) ---
+
+@equalizer_bp.route('/separate_ai', methods=['POST'])
+def separate_with_ai():
+    data = request.get_json()
+    signal_id = data.get('signal_id')
+    mode_name = data.get('mode_name') # Should be 'musical' or 'voices'
+
+    if not signal_id or signal_id not in SIGNAL_CACHE:
+        return jsonify({'error': 'Signal ID not found or invalid.'}), 404
+        
+    signal_data = SIGNAL_CACHE[signal_id]
+    
+    # 1. RETRIEVE UPLOAD FOLDER PATH (Correct way)
+    UPLOAD_FOLDER = current_app.config['UPLOAD_FOLDER'] 
+    Fs = signal_data['Fs']
+    time_series = signal_data['current_signal']
+    
+    try:
+        # 2. Save the signal from cache to a temporary file for AI input
+        temp_input_path = save_signal_to_temp(time_series, Fs, signal_id, UPLOAD_FOLDER)
+        
+        # Create a unique sub-folder for this signal's AI outputs
+        output_dir = os.path.join(UPLOAD_FOLDER, signal_id)
+        os.makedirs(output_dir, exist_ok=True)
+
+        # 3. Determine which AI model to run
+        if mode_name == 'musical':
+            source_paths = run_demucs_separation(temp_input_path, Fs, output_dir)
+            
+        elif mode_name == 'voices':
+            source_paths = run_speechbrain_separation(temp_input_path, Fs, output_dir)
+            
+        else:
+            os.remove(temp_input_path)
+            return jsonify({'error': 'Invalid mode for AI separation.'}), 400
+
+        # 4. Store the output source file paths in the cache
+        signal_data['ai_sources'] = source_paths
+        
+        # 5. Cleanup temporary AI input file
+        os.remove(temp_input_path) 
+        
+        # 6. Return keys for the frontend to render playback buttons
+        return jsonify({
+            'message': f"AI Separation complete using {mode_name} model.",
+            'sources': list(source_paths.keys()) # e.g., ['vocals', 'drums', 'bass']
+        }), 200
+
+    except Exception as e:
+        print(f"Error during AI separation: {e}")
+        return jsonify({'error': f'AI separation failed: {str(e)}'}), 500
+
+
+# --- NEW ENDPOINT 2: /api/equalizer/download_source (GET) ---
+
+@equalizer_bp.route('/download_source', methods=['GET'])
+def download_ai_source():
+    signal_id = request.args.get('signal_id')
+    source_key = request.args.get('source_key') # e.g., 'vocals', 'speaker_1'
+    
+    if not signal_id or signal_id not in SIGNAL_CACHE:
+        return jsonify({'error': 'Signal ID not found or invalid.'}), 404
+        
+    signal_data = SIGNAL_CACHE[signal_id]
+    
+    if 'ai_sources' not in signal_data or source_key not in signal_data['ai_sources']:
+        return jsonify({'error': f'AI source "{source_key}" not found for this signal.'}), 404
+        
+    source_filepath = signal_data['ai_sources'][source_key]
+    output_filename = os.path.basename(source_filepath)
+    
+    try:
+        # Serve the file for streaming
+        response = send_from_directory(
+            directory=os.path.dirname(source_filepath),
+            path=output_filename,
+            as_attachment=False, 
+            mimetype='audio/wav'
+        )
+        
+        return response
+        
+    except Exception as e:
+        print(f"Server error during AI source download: {e}")
+        return jsonify({'error': f'An unexpected error occurred during audio output: {str(e)}'}), 500
