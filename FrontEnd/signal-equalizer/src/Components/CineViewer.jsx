@@ -1,9 +1,84 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Card from "./Card";
 import Button from "./Button";
 import PanelControls from "./PanelControls";
+import { drawWaveform, drawPlaybackPosition } from "../utils/visualization";
 
-const CineViewer = () => {
+const CineViewer = ({ inputTimeSeries = [], outputTimeSeries = [], sampleRate = 44100, playbackPosition = 0, isPlaying = false, isVisible = true, onClose }) => {
+  const inputCanvasRef = useRef(null);
+  const outputCanvasRef = useRef(null);
+  const [status, setStatus] = useState("Paused");
+
+  if (!isVisible) {
+    return null;
+  }
+
+  useEffect(() => {
+    setStatus(isPlaying ? "Playing" : "Paused");
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (inputTimeSeries.length > 0 && inputCanvasRef.current) {
+      const canvas = inputCanvasRef.current;
+      const container = canvas.parentElement;
+      
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        canvas.width = rect.width || 500;
+        canvas.height = rect.height || 200;
+      } else {
+        canvas.width = 500;
+        canvas.height = 200;
+      }
+
+      // Draw waveform first
+      drawWaveform(canvas, inputTimeSeries);
+      
+      // Then draw playback position on top if playing
+      if (isPlaying && inputTimeSeries.length > 0) {
+        const duration = inputTimeSeries.length / sampleRate;
+        if (duration > 0) {
+          const position = Math.min(1, Math.max(0, playbackPosition / duration));
+          drawPlaybackPosition(canvas, position);
+        }
+      }
+    }
+  }, [inputTimeSeries, playbackPosition, isPlaying, sampleRate]);
+
+  useEffect(() => {
+    if (outputTimeSeries.length > 0 && outputCanvasRef.current) {
+      const canvas = outputCanvasRef.current;
+      const container = canvas.parentElement;
+      
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        canvas.width = rect.width || 500;
+        canvas.height = rect.height || 200;
+      } else {
+        canvas.width = 500;
+        canvas.height = 200;
+      }
+
+      // Draw waveform first
+      drawWaveform(canvas, outputTimeSeries);
+      
+      // Then draw playback position on top if playing
+      if (isPlaying && outputTimeSeries.length > 0) {
+        const duration = outputTimeSeries.length / sampleRate;
+        if (duration > 0) {
+          const position = Math.min(1, Math.max(0, playbackPosition / duration));
+          drawPlaybackPosition(canvas, position);
+        }
+      }
+    }
+  }, [outputTimeSeries, playbackPosition, isPlaying, sampleRate]);
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = (seconds % 60).toFixed(2);
+    return `${mins}:${secs.padStart(5, '0')}`;
+  };
+
   return (
     <Card className="cine-viewer">
       <div className="cine-viewer-header">
@@ -26,7 +101,7 @@ const CineViewer = () => {
           </svg>
           <h3>Linked Viewers</h3>
         </div>
-        <Button variant="ghost" className="close-btn">
+        <Button variant="ghost" className="close-btn" onClick={() => onClose && onClose()}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M18 6 6 18"></path>
             <path d="m6 6 12 12"></path>
@@ -38,26 +113,34 @@ const CineViewer = () => {
           <div className="cine-panel-header">
             <h4>Input Signal</h4>
             <div className="status-indicator">
-              <div className="status-dot"></div>
-              <span>Paused</span>
-              <span className="time-display">Time: 0.00s</span>
+              <div className="status-dot" style={{ backgroundColor: isPlaying ? "#7bf447ff" : "#666" }}></div>
+              <span>{status}</span>
+              <span className="time-display">Time: {formatTime(playbackPosition)}</span>
             </div>
           </div>
-          <div className="cine-content">
-            <canvas className="cine-canvas"></canvas>
+          <div className="cine-content" style={{ width: "100%", height: "200px", position: "relative" }}>
+            <canvas
+              ref={inputCanvasRef}
+              className="cine-canvas"
+              style={{ width: "100%", height: "100%", display: "block" }}
+            ></canvas>
           </div>
         </Card>
         <Card className="cine-panel">
           <div className="cine-panel-header">
             <h4>Output Signal</h4>
             <div className="status-indicator">
-              <div className="status-dot"></div>
-              <span>Paused</span>
-              <span className="time-display">Time: 0.00s</span>
+              <div className="status-dot" style={{ backgroundColor: isPlaying ? "#7bf447ff" : "#666" }}></div>
+              <span>{status}</span>
+              <span className="time-display">Time: {formatTime(playbackPosition)}</span>
             </div>
           </div>
-          <div className="cine-content">
-            <canvas className="cine-canvas"></canvas>
+          <div className="cine-content" style={{ width: "100%", height: "200px", position: "relative" }}>
+            <canvas
+              ref={outputCanvasRef}
+              className="cine-canvas"
+              style={{ width: "100%", height: "100%", display: "block" }}
+            ></canvas>
           </div>
         </Card>
       </div>

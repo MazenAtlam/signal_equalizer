@@ -104,6 +104,11 @@
   border-radius: var(--radius);
 }
 
+.panel-title {
+  color: hsl(var(--muted-foreground));
+  font-size: 1rem;
+}
+
 /* AudioPlayer */
 .audio-player-grid {
   display: grid;
@@ -112,16 +117,19 @@
 }
 
 .audio-controls {
-  display: flex;
   align-items: center;
   gap: 0.75rem;
 }
 
-.audio-time-display {
+.audio-time-display, .audio-controls {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 0.75rem;
   color: hsl(var(--muted-foreground));
   min-width: 3rem;
+}
+
+.progress-bar {
+  flex-direction: row;
 }
 
 .speed-control {

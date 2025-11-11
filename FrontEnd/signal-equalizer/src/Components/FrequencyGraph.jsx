@@ -1,12 +1,42 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Card from "./Card";
 import Button from "./Button";
+import { drawFrequencyGraph } from "../utils/visualization";
 
-const FrequencyGraph = () => {
+const FrequencyGraph = ({ frequencies = [], magnitudes = [], isVisible = true, onClose }) => {
   const [activeScale, setActiveScale] = useState("linear");
   const [hovered1, setHovered1] = useState(false);
   const [hovered2, setHovered2] = useState(false);
   const [hovered3, setHovered3] = useState(false);
+  const canvasRef = useRef(null);
+
+  if (!isVisible) {
+    return null;
+  }
+
+  useEffect(() => {
+    if (frequencies.length > 0 && magnitudes.length > 0 && canvasRef.current) {
+      const canvas = canvasRef.current;
+      const container = canvas.parentElement;
+      
+      // Set canvas size based on container
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        canvas.width = rect.width || 800;
+        canvas.height = rect.height || 400;
+      } else {
+        canvas.width = 800;
+        canvas.height = 400;
+      }
+
+      // Draw the frequency graph
+      drawFrequencyGraph(canvas, frequencies, magnitudes, activeScale);
+    }
+  }, [frequencies, magnitudes, activeScale]);
+
+  const handleScaleChange = (scale) => {
+    setActiveScale(scale);
+  };
 
   return (
     <Card className="frequency-graph">
@@ -64,7 +94,7 @@ const FrequencyGraph = () => {
                     border: "1px solid transparent",
                   }
             }
-            onClick={() => setActiveScale("linear")}
+            onClick={() => handleScaleChange("linear")}
           >
             Linear
           </Button>
@@ -106,7 +136,7 @@ const FrequencyGraph = () => {
                     border: "1px solid transparent",
                   }
             }
-            onClick={() => setActiveScale("audiogram")}
+            onClick={() => handleScaleChange("audiogram")}
           >
             Audiogram
           </Button>
@@ -115,6 +145,7 @@ const FrequencyGraph = () => {
             className="close-btn border-0  "
             onMouseEnter={() => setHovered3(true)}
             onMouseLeave={() => setHovered3(false)}
+            onClick={() => onClose && onClose()}
             style={
               hovered3
                 ? {
@@ -139,8 +170,12 @@ const FrequencyGraph = () => {
           </Button>
         </div>
       </div>
-      <div className="frequency-graph-canvas">
-        <canvas className="graph-canvas"></canvas>
+      <div className="frequency-graph-canvas" style={{ width: "100%", height: "400px" }}>
+        <canvas
+          ref={canvasRef}
+          className="graph-canvas"
+          style={{ width: "100%", height: "100%", display: "block" }}
+        ></canvas>
       </div>
     </Card>
   );

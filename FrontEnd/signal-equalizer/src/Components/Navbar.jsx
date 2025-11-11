@@ -22,7 +22,7 @@ const Navbar = () => {
           <path d="M13 17V5"></path>
           <path d="M8 17v-3"></path>
         </svg>
-        <h1 className="text-2xl font-bold gradient-text">Signal Equalizer</h1>
+        <h1 className="text-2xl font-bold mb-0 gradient-text">Signal Equalizer</h1>
       </div>
       <div className="d-flex align-items-center gap-3">
         <Button

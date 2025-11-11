@@ -2,7 +2,11 @@ import React from "react";
 import Button from "./Button";
 import Subdivision from "./Subdivision";
 
-const GenericEqualizer = () => {
+const GenericEqualizer = ({ isVisible = true, onClose }) => {
+  if (!isVisible) {
+    return null;
+  }
+
   return (
     <div className="generic-equalizer">
       <div className="equalizer-content">
@@ -65,7 +69,7 @@ const GenericEqualizer = () => {
               </svg>
               Save Scheme
             </Button>
-            <Button variant="ghost" className="close-btn">
+            <Button variant="ghost" className="close-btn" onClick={() => onClose && onClose()}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path d="M18 6 6 18"></path>
                 <path d="m6 6 12 12"></path>
