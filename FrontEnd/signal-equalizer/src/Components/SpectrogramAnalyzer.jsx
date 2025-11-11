@@ -1,9 +1,52 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Card from "./Card";
 import Button from "./Button";
+import { drawSpectrogram } from "../utils/visualization";
 
-const SpectrogramAnalyzer = () => {
+const SpectrogramAnalyzer = ({ inputSpectrogram = [], outputSpectrogram = [], isVisible = true, onClose }) => {
   const [hovered, setHovered] = useState(false);
+  const inputCanvasRef = useRef(null);
+  const outputCanvasRef = useRef(null);
+
+  if (!isVisible) {
+    return null;
+  }
+
+  useEffect(() => {
+    if (inputSpectrogram.length > 0 && inputCanvasRef.current) {
+      const canvas = inputCanvasRef.current;
+      const container = canvas.parentElement;
+      
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        canvas.width = rect.width || 400;
+        canvas.height = rect.height || 300;
+      } else {
+        canvas.width = 400;
+        canvas.height = 300;
+      }
+
+      drawSpectrogram(canvas, inputSpectrogram);
+    }
+  }, [inputSpectrogram]);
+
+  useEffect(() => {
+    if (outputSpectrogram.length > 0 && outputCanvasRef.current) {
+      const canvas = outputCanvasRef.current;
+      const container = canvas.parentElement;
+      
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        canvas.width = rect.width || 400;
+        canvas.height = rect.height || 300;
+      } else {
+        canvas.width = 400;
+        canvas.height = 300;
+      }
+
+      drawSpectrogram(canvas, outputSpectrogram);
+    }
+  }, [outputSpectrogram]);
 
   return (
     <Card className="spectrogram-analyzer">
@@ -32,6 +75,7 @@ const SpectrogramAnalyzer = () => {
           className="close-btn border-0  "
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
+          onClick={() => onClose && onClose()}
           style={
             hovered
               ? {
@@ -57,15 +101,23 @@ const SpectrogramAnalyzer = () => {
       </div>
       <div className="spectrogram-grid d-flex gap-3 px-5 my-4 ">
         <Card className="spectrogram-panel col-6">
-          <h5 className="panel-title px-4 py-2">Input Spectrogram</h5>
-          <div className="panel-content">
-            <canvas className="spectrogram-canvas"></canvas>
+          <h6 className="panel-title px-4 py-2">Input Spectrogram</h6>
+          <div className="panel-content" style={{ width: "100%", height: "300px", position: "relative" }}>
+            <canvas
+              ref={inputCanvasRef}
+              className="spectrogram-canvas"
+              style={{ width: "100%", height: "100%", display: "block" }}
+            ></canvas>
           </div>
         </Card>
         <Card className="spectrogram-panel col-6">
           <h5 className="panel-title px-4 py-2">Output Spectrogram</h5>
-          <div className="panel-content">
-            <canvas className="spectrogram-canvas"></canvas>
+          <div className="panel-content" style={{ width: "100%", height: "300px", position: "relative" }}>
+            <canvas
+              ref={outputCanvasRef}
+              className="spectrogram-canvas"
+              style={{ width: "100%", height: "100%", display: "block" }}
+            ></canvas>
           </div>
         </Card>
       </div>
