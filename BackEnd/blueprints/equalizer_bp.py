@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
 import os, sys
 import numpy as np
+import time
 
 # --- 1. Utility Imports ---
 # Configure paths to import utils correctly
@@ -9,10 +10,11 @@ sys.path.append(os.path.join(BASE_DIR, 'utils'))
 
 # Import shared cache and core DSP functions
 from blueprints.audio_bp import SIGNAL_CACHE
-from custom_fft import custom_ifft, get_fft_components
+from custom_fft import custom_fft, custom_ifft, get_fft_components
 from spectrogram import custom_spectrogram
 from equalizer_core import apply_equalization
 from ai_separator import run_demucs_separation, run_speechbrain_separation, save_signal_to_temp
+from recombination_core import apply_eq_and_recombine, calculate_performance_metrics
 equalizer_bp = Blueprint('equalizer_bp', __name__)
 
 # --- Helper to generate common response data (prevents code repetition) ---
@@ -229,3 +231,66 @@ def download_ai_source():
     except Exception as e:
         print(f"Server error during AI source download: {e}")
         return jsonify({'error': f'An unexpected error occurred during audio output: {str(e)}'}), 500
+    
+
+# --- NEW ENDPOINT: /api/equalizer/equalize_with_ai (POST) ---
+@equalizer_bp.route('/equalize_with_ai', methods=['POST'])
+def equalize_with_ai_comparison():
+    data = request.get_json()
+    signal_id = data.get('signal_id')
+    customized_mode_preset = data.get('customized_mode_preset')
+    mode_name = customized_mode_preset.lower() if customized_mode_preset else None # e.g., 'musical'
+    eq_scheme = data.get('equalizer_scheme')
+
+    if not signal_id or signal_id not in SIGNAL_CACHE:
+        return jsonify({'error': 'Signal ID not found or invalid.'}), 404
+        
+    if not customized_mode_preset or not mode_name:
+        return jsonify({'error': 'Customized mode preset is missing or invalid.'}), 400
+        
+    if not eq_scheme:
+        return jsonify({'error': 'Equalization scheme is missing.'}), 400
+        
+    signal_data = SIGNAL_CACHE[signal_id]
+    UPLOAD_FOLDER = current_app.config['UPLOAD_FOLDER'] 
+    Fs = signal_data['Fs']
+    
+    # Use the current signal (if it has been previously equalized, otherwise uses input)
+    input_time_series = signal_data['current_signal']
+    
+    try:
+        # --- 1. AI Separation ---
+        temp_input_path = save_signal_to_temp(input_time_series, Fs, signal_id, UPLOAD_FOLDER)
+        output_dir = os.path.join(UPLOAD_FOLDER, signal_id, f"ai_run_{int(time.time())}") # Unique folder for this run
+        os.makedirs(output_dir, exist_ok=True)
+
+        if mode_name == 'musical':
+            source_paths = run_demucs_separation(temp_input_path, Fs, output_dir)
+        elif mode_name == 'human' or mode_name == 'voices':
+            source_paths = run_speechbrain_separation(temp_input_path, Fs, output_dir)
+        else:
+            os.remove(temp_input_path)
+            return jsonify({'error': 'Invalid preset. Must be Musical or Human.'}), 400
+
+        # --- 2. Custom Equalization & Recombination ---
+        reconstructed_signal = apply_eq_and_recombine(source_paths, Fs, eq_scheme, UPLOAD_FOLDER)
+        
+        # --- 3. Visualization Data for the Reconstructed Signal ---
+        reconstructed_fft = custom_fft(reconstructed_signal)
+        frequencies, magnitudes_db, phases = get_fft_components(reconstructed_fft, Fs)
+        
+        # --- 4. Metric Calculation (Placeholder) ---
+        performance_metrics = calculate_performance_metrics()
+        
+        # --- 5. Return Frontend Format ---
+        return jsonify({
+            'signal_id': signal_id,
+            'ai_frequency_arr': frequencies.tolist(),
+            'ai_magnitude_arr': magnitudes_db.tolist(),
+            'ai_time_series': reconstructed_signal.tolist(), # Full time series for cine viewer
+            'performance': performance_metrics
+        }), 200
+
+    except Exception as e:
+        print(f"Error in equalize_with_ai: {e}")
+        return jsonify({'error': f'An unexpected error occurred during AI comparison: {str(e)}'}), 500    
