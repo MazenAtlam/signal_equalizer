@@ -2,3 +2,10 @@ Flask
 Flask-CORS
 numpy
 pydub
+torch
+torchaudio
+torchcodec
+demucs
+speechbrain
+soundfile
+librosa
