@@ -3,7 +3,11 @@ import React, { useState, useRef } from "react";
 import Card from "./Card";
 import Button from "./Button";
 import { uploadAudio } from "../utils/api";
-import { generateMockAudioData, audioFileToTimeSeries, createAudioURL } from "../utils/audioUtils";
+import {
+  generateMockAudioData,
+  audioFileToTimeSeries,
+  createAudioURL,
+} from "../utils/audioUtils";
 import { useToast } from "./Toast";
 
 const UploadCard = ({ onDataLoad, onError }) => {
@@ -19,10 +23,10 @@ const UploadCard = ({ onDataLoad, onError }) => {
     try {
       // Upload file to backend API
       const response = await uploadAudio(file);
-      
+
       // Create audio URL for playback
       const inputAudioURL = URL.createObjectURL(file);
-      
+
       // For output, we'll use the same data initially (before equalization)
       // The backend returns the processed data
       const outputAudioURL = createAudioURL(response.time_series, response.Fs);
@@ -30,10 +34,9 @@ const UploadCard = ({ onDataLoad, onError }) => {
       // Generate spectrogram data if not provided
       // For now, we'll create a simple spectrogram from the data
       // In a real implementation, this would come from the backend
-      const spectrogramData = response.spectrogram_data || generateSpectrogramFromTimeSeries(
-        response.time_series,
-        response.Fs
-      );
+      const spectrogramData =
+        response.spectrogram_data ||
+        generateSpectrogramFromTimeSeries(response.time_series, response.Fs);
 
       // Call callback with loaded data
       if (onDataLoad) {
@@ -84,11 +87,20 @@ const UploadCard = ({ onDataLoad, onError }) => {
     try {
       // Generate mock audio data
       const mockData = generateMockAudioData(2, 44100);
-      
-      // Create audio URL for playback
-      const audioURL = createAudioURL(mockData.timeSeries, mockData.sampleRate);
 
-      // Generate simple spectrogram for mock data
+      // Create audio URL for playback - same as upload
+      const inputAudioURL = createAudioURL(
+        mockData.timeSeries,
+        mockData.sampleRate
+      );
+
+      // For output, use the same data initially (before equalization) - same as upload
+      const outputAudioURL = createAudioURL(
+        mockData.timeSeries,
+        mockData.sampleRate
+      );
+
+      // Generate spectrogram data if not provided - same as upload
       const spectrogramData = generateSpectrogramFromTimeSeries(
         mockData.timeSeries,
         mockData.sampleRate
@@ -97,7 +109,7 @@ const UploadCard = ({ onDataLoad, onError }) => {
       // Create a mock signal_id
       const signalId = `mock_${Date.now()}`;
 
-      // Call callback with mock data
+      // Call callback with loaded data - same structure as upload
       if (onDataLoad) {
         onDataLoad({
           input: {
@@ -105,7 +117,7 @@ const UploadCard = ({ onDataLoad, onError }) => {
             frequency_arr: mockData.frequencies,
             magnitude_arr: mockData.magnitudes,
             time_series: mockData.timeSeries,
-            audioURL: audioURL,
+            audioURL: inputAudioURL,
             Fs: mockData.sampleRate,
             duration: mockData.timeSeries.length / mockData.sampleRate,
             spectrogram_data: spectrogramData,
@@ -115,7 +127,7 @@ const UploadCard = ({ onDataLoad, onError }) => {
             frequency_arr: mockData.frequencies,
             magnitude_arr: mockData.magnitudes,
             time_series: mockData.timeSeries,
-            audioURL: audioURL,
+            audioURL: outputAudioURL,
             Fs: mockData.sampleRate,
             duration: mockData.timeSeries.length / mockData.sampleRate,
             spectrogram_data: spectrogramData,
@@ -151,7 +163,7 @@ const UploadCard = ({ onDataLoad, onError }) => {
       const start = t * step;
       const end = Math.min(start + windowSize, timeSeries.length);
       const frame = timeSeries.slice(start, end);
-      
+
       // Pad if necessary
       while (frame.length < windowSize) {
         frame.push(0);
@@ -162,7 +174,7 @@ const UploadCard = ({ onDataLoad, onError }) => {
         let real = 0;
         let imag = 0;
         for (let n = 0; n < windowSize; n++) {
-          const angle = -2 * Math.PI * f * n / windowSize;
+          const angle = (-2 * Math.PI * f * n) / windowSize;
           real += frame[n] * Math.cos(angle);
           imag += frame[n] * Math.sin(angle);
         }
@@ -176,10 +188,16 @@ const UploadCard = ({ onDataLoad, onError }) => {
   };
 
   return (
-    <Card className="p-4">
+    <Card className="p-4 col-10 mx-auto">
       <div className="upload-area">
         <label htmlFor="audio-upload" className="upload-label">
-          <div className="upload-box" style={{ cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1 }}>
+          <div
+            className="upload-box"
+            style={{
+              cursor: loading ? "not-allowed" : "pointer",
+              opacity: loading ? 0.6 : 1,
+            }}
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="24"

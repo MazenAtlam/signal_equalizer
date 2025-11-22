@@ -454,12 +454,12 @@ body {
 
 .slider-track {
   position: relative;
-  height: 0.5rem;
+  height: 1.5rem;
   width: 100%;
   flex-grow: 1;
   overflow: hidden;
   border-radius: 9999px;
-  background-color: hsl(var(--secondary));
+  background-color: hsl(var(--secondary)) !important;
 }
 
 .slider-range {
@@ -470,11 +470,11 @@ body {
 
 .slider-thumb {
   display: block;
-  height: 1.25rem;
-  width: 1.25rem;
+  height: 2.55rem;
+  width: 2.55rem;
   border-radius: 50%;
   border: 2px solid hsl(var(--primary));
-  background-color: hsl(var(--background));
+  background-color: black;
   transition: background-color 0.2s;
 }
 

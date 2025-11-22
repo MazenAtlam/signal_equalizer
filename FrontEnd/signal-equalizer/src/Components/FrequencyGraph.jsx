@@ -3,7 +3,12 @@ import Card from "./Card";
 import Button from "./Button";
 import { drawFrequencyGraph } from "../utils/visualization";
 
-const FrequencyGraph = ({ frequencies = [], magnitudes = [], isVisible = true, onClose }) => {
+const FrequencyGraph = ({
+  frequencies = [],
+  magnitudes = [],
+  isVisible = true,
+  onClose,
+}) => {
   const [activeScale, setActiveScale] = useState("linear");
   const [hovered1, setHovered1] = useState(false);
   const [hovered2, setHovered2] = useState(false);
@@ -18,7 +23,7 @@ const FrequencyGraph = ({ frequencies = [], magnitudes = [], isVisible = true, o
     if (frequencies.length > 0 && magnitudes.length > 0 && canvasRef.current) {
       const canvas = canvasRef.current;
       const container = canvas.parentElement;
-      
+
       // Set canvas size based on container
       if (container) {
         const rect = container.getBoundingClientRect();
@@ -39,9 +44,9 @@ const FrequencyGraph = ({ frequencies = [], magnitudes = [], isVisible = true, o
   };
 
   return (
-    <Card className="frequency-graph">
+    <Card className="frequency-graph col-10 mx-auto px-4 pb-4">
       <div className="frequency-graph-header d-flex justify-content-between pt-3">
-        <div className="frequency-graph-title d-flex px-4 pt-2">
+        <div className="frequency-graph-title d-flex  pt-2">
           <svg
             width="28"
             height="28"
@@ -55,7 +60,7 @@ const FrequencyGraph = ({ frequencies = [], magnitudes = [], isVisible = true, o
           </svg>
           <h5 className="ms-2">Frequency Graph</h5>
         </div>
-        <div className="frequency-graph-controls px-4 pt-2 d-flex gap-3">
+        <div className="frequency-graph-controls px-2 pt-2 d-flex gap-3 mb-4">
           <Button
             onMouseEnter={() => setHovered1(true)}
             onMouseLeave={() => setHovered1(false)}
@@ -170,7 +175,10 @@ const FrequencyGraph = ({ frequencies = [], magnitudes = [], isVisible = true, o
           </Button>
         </div>
       </div>
-      <div className="frequency-graph-canvas" style={{ width: "100%", height: "400px" }}>
+      <div
+        className="frequency-graph-canvas"
+        style={{ width: "100%", height: "400px" }}
+      >
         <canvas
           ref={canvasRef}
           className="graph-canvas"
