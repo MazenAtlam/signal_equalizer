@@ -66,16 +66,27 @@ def apply_eq_and_recombine(source_paths, Fs, eq_scheme, UPLOAD_FOLDER):
         
     return final_mixture
     
-def calculate_performance_metrics():
-    """
-    Placeholder for the complex evaluation metrics (SDR, SI-SDR, etc.)
-    This function would compare: (AI-Separated Sources) vs (Original Ground Truth/Mixed Input)
-    """
-    return {
-        'SDR / SIR / SAR' : 0.0,
-        'SI-SDR (scale-invariant SDR)' : 0.0,
-        'Log-spectral distance / spectral convergence / L2 on magnitude spectrograms' : 0.0,
-        'Reconstruction error' : 0.0,
-        'Perceptual / listening test (MOS / AB test)' : 0.0,
-        'Runtime / memory' : 0.0
+def calculate_performance_metrics(static_time_series, ai_time_series):
+    # 1. Ensure lengths match
+    min_len = min(len(static_time_series), len(ai_time_series))
+    
+    # 2. Trim both signals to the minimum length
+    static_trimmed = static_time_series[:min_len]
+    ai_trimmed = ai_time_series[:min_len]
+
+    # 3. Calculate Mean Squared Error (Difference calculation)
+    difference_array = static_trimmed - ai_trimmed
+    mse = np.mean(difference_array ** 2)
+    
+    # 4. Calculate Percentage Difference (Normalized Error)
+    norm_diff = np.linalg.norm(difference_array)
+    norm_static = np.linalg.norm(static_trimmed)
+    
+    percent_diff = (norm_diff / norm_static) * 100 if norm_static > 0 else 0
+
+    performance = {
+        "mse": float(mse),           # Convert numpy float to python float for JSON
+        "percent_diff": float(percent_diff)
     }
+
+    return performance

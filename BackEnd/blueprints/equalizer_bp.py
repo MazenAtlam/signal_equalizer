@@ -15,6 +15,7 @@ from spectrogram import custom_spectrogram
 from equalizer_core import apply_equalization
 from ai_separator import run_demucs_separation, run_speechbrain_separation, save_signal_to_temp
 from recombination_core import apply_eq_and_recombine, calculate_performance_metrics
+from utils.equalizer_core import calculate_static_output
 equalizer_bp = Blueprint('equalizer_bp', __name__)
 
 # --- Helper to generate common response data (prevents code repetition) ---
@@ -233,13 +234,75 @@ def download_ai_source():
         return jsonify({'error': f'An unexpected error occurred during audio output: {str(e)}'}), 500
     
 
-# --- NEW ENDPOINT: /api/equalizer/equalize_with_ai (POST) ---
+# # --- NEW ENDPOINT: /api/equalizer/equalize_with_ai (POST) ---
+# @equalizer_bp.route('/equalize_with_ai', methods=['POST'])
+# def equalize_with_ai_comparison():
+#     data = request.get_json()
+#     signal_id = data.get('signal_id')
+#     customized_mode_preset = data.get('customized_mode_preset')
+#     mode_name = customized_mode_preset.lower() if customized_mode_preset else None # e.g., 'musical'
+#     eq_scheme = data.get('equalizer_scheme')
+
+#     if not signal_id or signal_id not in SIGNAL_CACHE:
+#         return jsonify({'error': 'Signal ID not found or invalid.'}), 404
+        
+#     if not customized_mode_preset or not mode_name:
+#         return jsonify({'error': 'Customized mode preset is missing or invalid.'}), 400
+        
+#     if not eq_scheme:
+#         return jsonify({'error': 'Equalization scheme is missing.'}), 400
+        
+#     signal_data = SIGNAL_CACHE[signal_id]
+#     UPLOAD_FOLDER = current_app.config['UPLOAD_FOLDER'] 
+#     Fs = signal_data['Fs']
+    
+#     # Use the current signal (if it has been previously equalized, otherwise uses input)
+#     input_time_series = signal_data['current_signal']
+    
+#     try:
+#         static_time_series = calculate_static_output(input_time_series, Fs, eq_scheme)
+#         # --- 1. AI Separation ---
+#         temp_input_path = save_signal_to_temp(input_time_series, Fs, signal_id, UPLOAD_FOLDER)
+#         output_dir = os.path.join(UPLOAD_FOLDER, signal_id, f"ai_run_{int(time.time())}") # Unique folder for this run
+#         os.makedirs(output_dir, exist_ok=True)
+
+#         if mode_name == 'musical':
+#             source_paths = run_demucs_separation(temp_input_path, Fs, output_dir)
+#         elif mode_name == 'human' or mode_name == 'voices':
+#             source_paths = run_speechbrain_separation(temp_input_path, Fs, output_dir)
+#         else:
+#             os.remove(temp_input_path)
+#             return jsonify({'error': 'Invalid preset. Must be Musical or Human.'}), 400
+
+#         # --- 2. Custom Equalization & Recombination ---
+#         reconstructed_signal = apply_eq_and_recombine(source_paths, Fs, eq_scheme, UPLOAD_FOLDER)
+        
+#         # --- 3. Visualization Data for the Reconstructed Signal ---
+#         reconstructed_fft = custom_fft(reconstructed_signal)
+#         frequencies, magnitudes_db, phases = get_fft_components(reconstructed_fft, Fs)
+        
+#         # --- 4. Metric Calculation (Placeholder) ---
+#         performance_metrics = calculate_performance_metrics(static_time_series, reconstructed_fft)
+        
+#         # --- 5. Return Frontend Format ---
+#         return jsonify({
+#             'signal_id': signal_id,
+#             'ai_frequency_arr': frequencies.tolist(),
+#             'ai_magnitude_arr': magnitudes_db.tolist(),
+#             'ai_time_series': reconstructed_signal.tolist(), # Full time series for cine viewer
+#             'performance': performance_metrics
+#         }), 200
+
+#     except Exception as e:
+#         print(f"Error in equalize_with_ai: {e}")
+#         return jsonify({'error': f'An unexpected error occurred during AI comparison: {str(e)}'}), 500    
+
 @equalizer_bp.route('/equalize_with_ai', methods=['POST'])
 def equalize_with_ai_comparison():
     data = request.get_json()
     signal_id = data.get('signal_id')
     customized_mode_preset = data.get('customized_mode_preset')
-    mode_name = customized_mode_preset.lower() if customized_mode_preset else None # e.g., 'musical'
+    mode_name = customized_mode_preset.lower() if customized_mode_preset else None
     eq_scheme = data.get('equalizer_scheme')
 
     if not signal_id or signal_id not in SIGNAL_CACHE:
@@ -252,45 +315,49 @@ def equalize_with_ai_comparison():
         return jsonify({'error': 'Equalization scheme is missing.'}), 400
         
     signal_data = SIGNAL_CACHE[signal_id]
+    # Ensure you are importing os, time, current_app, etc.
     UPLOAD_FOLDER = current_app.config['UPLOAD_FOLDER'] 
     Fs = signal_data['Fs']
-    
-    # Use the current signal (if it has been previously equalized, otherwise uses input)
     input_time_series = signal_data['current_signal']
     
     try:
+        # --- 0. Static Baseline (Time Domain) ---
+        static_time_series = calculate_static_output(input_time_series, Fs, eq_scheme)
+
         # --- 1. AI Separation ---
         temp_input_path = save_signal_to_temp(input_time_series, Fs, signal_id, UPLOAD_FOLDER)
-        output_dir = os.path.join(UPLOAD_FOLDER, signal_id, f"ai_run_{int(time.time())}") # Unique folder for this run
+        output_dir = os.path.join(UPLOAD_FOLDER, signal_id, f"ai_run_{int(time.time())}") 
         os.makedirs(output_dir, exist_ok=True)
 
         if mode_name == 'musical':
             source_paths = run_demucs_separation(temp_input_path, Fs, output_dir)
-        elif mode_name == 'human' or mode_name == 'voices':
+        elif mode_name in ['human', 'voices']: # Flexible check
             source_paths = run_speechbrain_separation(temp_input_path, Fs, output_dir)
         else:
-            os.remove(temp_input_path)
+            if os.path.exists(temp_input_path): os.remove(temp_input_path)
             return jsonify({'error': 'Invalid preset. Must be Musical or Human.'}), 400
 
-        # --- 2. Custom Equalization & Recombination ---
+        # --- 2. Custom Equalization & Recombination (Time Domain) ---
         reconstructed_signal = apply_eq_and_recombine(source_paths, Fs, eq_scheme, UPLOAD_FOLDER)
         
-        # --- 3. Visualization Data for the Reconstructed Signal ---
+        # --- 3. Visualization Data ---
+        # We need FFT for the graph, but NOT for the metric comparison
         reconstructed_fft = custom_fft(reconstructed_signal)
         frequencies, magnitudes_db, phases = get_fft_components(reconstructed_fft, Fs)
         
-        # --- 4. Metric Calculation (Placeholder) ---
-        performance_metrics = calculate_performance_metrics()
+        # --- 4. Metric Calculation ---
+        # FIX IS HERE: Use reconstructed_signal (Time) vs static_time_series (Time)
+        performance_metrics = calculate_performance_metrics(static_time_series, reconstructed_signal)
         
         # --- 5. Return Frontend Format ---
         return jsonify({
             'signal_id': signal_id,
             'ai_frequency_arr': frequencies.tolist(),
             'ai_magnitude_arr': magnitudes_db.tolist(),
-            'ai_time_series': reconstructed_signal.tolist(), # Full time series for cine viewer
+            'ai_time_series': reconstructed_signal.tolist(), 
             'performance': performance_metrics
         }), 200
 
     except Exception as e:
         print(f"Error in equalize_with_ai: {e}")
-        return jsonify({'error': f'An unexpected error occurred during AI comparison: {str(e)}'}), 500    
+        return jsonify({'error': f'An unexpected error occurred: {str(e)}'}), 500
