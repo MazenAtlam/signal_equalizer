@@ -180,7 +180,7 @@ def _load_speechbrain_separator():
     return SPEECHBRAIN_SEPARATOR
 # -------------------------------------------------------------------------
 
-def save_signal_to_temp(signal_array, Fs, signal_id, UPLOAD_FOLDER):
+# def save_signal_to_temp(signal_array, Fs, signal_id, UPLOAD_FOLDER):
     """
     Saves the current signal (from cache) to a temporary WAV file for AI input.
     Uses PCM_16 format which is widely compatible and doesn't require torchcodec.
@@ -201,6 +201,36 @@ def save_signal_to_temp(signal_array, Fs, signal_id, UPLOAD_FOLDER):
     sf.write(temp_input_filepath, signal_array, int(Fs), format='WAV', subtype='PCM_16')
     
     # Verify the file was created and is readable
+    if not os.path.exists(temp_input_filepath):
+        raise RuntimeError(f"Failed to create temporary audio file: {temp_input_filepath}")
+    
+    return temp_input_filepath
+
+def save_signal_to_temp(signal_array, Fs, signal_id, UPLOAD_FOLDER):
+    """
+    Saves the current signal (from cache) to a temporary WAV file for AI input.
+    Uses PCM_16 format which is widely compatible and doesn't require torchcodec.
+    """
+    temp_input_filename = f"ai_input_{signal_id}.wav"
+    temp_input_filepath = os.path.join(UPLOAD_FOLDER, temp_input_filename)
+    
+    # Ensure signal is in the right format (float32, normalized to [-1, 1])
+    if signal_array.dtype != np.float32:
+        signal_array = signal_array.astype(np.float32)
+    
+    # Normalize to prevent clipping
+    max_val = np.max(np.abs(signal_array))
+    if max_val > 1.0:
+        signal_array = signal_array / max_val
+
+    # --- Convert mono → stereo for Demucs ---
+    if signal_array.ndim == 1:  
+        signal_array = np.stack([signal_array, signal_array], axis=1)  
+        # shape becomes (samples, 2)
+
+    # Save as PCM_16 WAV
+    sf.write(temp_input_filepath, signal_array, int(Fs), format='WAV', subtype='PCM_16')
+    
     if not os.path.exists(temp_input_filepath):
         raise RuntimeError(f"Failed to create temporary audio file: {temp_input_filepath}")
     
@@ -353,63 +383,69 @@ def run_demucs_separation(input_filepath, Fs, output_dir):
         error_msg += "3. Or try downgrading PyTorch: pip install torch==2.4.0 torchaudio==2.4.0"
         raise RuntimeError(error_msg) from e
 
-
-# --- 2. SPEECHBRAIN IMPLEMENTATION ---
 def run_speechbrain_separation(input_filepath, Fs, output_dir):
     """
-    Runs the SpeechBrain model (Sepformer) for Human Voices mode.
-    Loads model from local models directory instead of HuggingFace.
-    Model expects 8kHz input, so we resample if needed.
+    Runs the MultiDecoderDPRNN model with safety checks for Sample Rate and Channels.
     """
-    print(f"Running SpeechBrain on {input_filepath} (Device: {DEVICE})...")
+    print(f"Running MultiDecoderDPRNN on {input_filepath} (Device: {DEVICE})...")
     
-    # Ensure output directory exists
+    # 1. Load the model
+    model = _load_voice_model()
     os.makedirs(output_dir, exist_ok=True)
+
+    # 2. Load Audio
+    try:
+        mixture, file_fs = torchaudio.load(input_filepath)
+        
+        # --- SAFETY CHECK 1: FORCE MONO ---
+        # If stereo (2, N), average to mono (1, N)
+        if mixture.shape[0] > 1:
+            mixture = torch.mean(mixture, dim=0, keepdim=True)
+
+        # --- SAFETY CHECK 2: RESAMPLE IF NEEDED ---
+        # Most Asteroid/DPRNN models expect 8000 Hz. 
+        # If your model is 8k but file is 44k, we must resample.
+        MODEL_SAMPLE_RATE = 8000 
+        
+        if file_fs != MODEL_SAMPLE_RATE:
+            resampler = torchaudio.transforms.Resample(orig_freq=file_fs, new_freq=MODEL_SAMPLE_RATE)
+            mixture = resampler(mixture)
+
+        mixture = mixture.to(DEVICE)
+
+    except Exception as e:
+        raise RuntimeError(f"Failed to load/process audio file: {e}")
+
+    # 3. Perform Separation
+    try:
+        with torch.no_grad():
+            est_sources = model.separate(mixture)
+            est_sources = est_sources.cpu()
+    except Exception as e:
+        raise RuntimeError(f"Inference failed on MultiDecoderDPRNN: {e}")
+
+    # 4. Save Outputs
+    if est_sources.ndim == 3 and est_sources.shape[0] == 1:
+        est_sources = est_sources.squeeze(0)
+
+    sources_dict = {}
+    print(f"Saving {est_sources.shape[0]} separated sources...")
     
-    # Load separator if not already loaded
-    separator = _load_speechbrain_separator()
-    
-    # Model expects 8kHz input (per hyperparams.yaml: sample_rate: 8000)
-    model_sr = 8000
-    
-    # Resample input to 8kHz if needed
-    if Fs != model_sr:
-        print(f"Resampling input from {Fs} Hz to {model_sr} Hz...")
-        y, sr = librosa.load(input_filepath, sr=None, mono=True)
-        if sr != model_sr:
-            y = librosa.resample(y, orig_sr=sr, target_sr=model_sr)
-        # Write resampled audio to temp file
-        temp_resampled = os.path.join(output_dir, "temp_resampled_8k.wav")
-        sf.write(temp_resampled, y, model_sr)
-        input_filepath = temp_resampled
-    
-    # Perform Separation (returns PyTorch tensor)
-    # The result shape is typically [batch, n_sources, time_samples]
-    est_sources = separator.separate_file(path=input_filepath)
-    
-    # Clean up temp resampled file if created
-    if Fs != model_sr and os.path.exists(input_filepath) and "temp_resampled" in input_filepath:
-        os.remove(input_filepath)
-    
-    sources = {}
-    # Save separated tensors back to disk
-    # est_sources shape from SpeechBrain: [batch, time_samples, n_sources]
-    # Process to get [n_sources, time_samples] (matching notebook pattern)
-    est = est_sources.detach().cpu().squeeze(0)  # Remove batch: [time_samples, n_sources]
-    est = est.transpose(0, 1)  # Transpose: [n_sources, time_samples]
-    
-    # The output of the model is at 8kHz
-    # est shape is now [n_sources, time_samples]
-    for i in range(est.shape[0]):
+    for i in range(est_sources.shape[0]):
         source_key = f"speaker_{i+1}"
-        output_path = os.path.join(output_dir, f"{source_key}.wav")
+        output_filename = f"{source_key}.wav"
+        output_path = os.path.join(output_dir, output_filename)
         
-        # Extract source tensor (1D array of time samples)
-        source_tensor = est[i]  # Shape: [time_samples]
-        
-        # Convert to numpy and save with soundfile (matching notebook approach)
-        source_array = source_tensor.numpy()
-        sf.write(output_path, source_array, model_sr)
-        sources[source_key] = output_path
-        
-    return sources
+        source_tensor = est_sources[i]
+        if source_tensor.ndim == 1:
+            source_tensor = source_tensor.unsqueeze(0)
+            
+        # IMPORTANT: Save at the MODEL'S sample rate (8000), not the original Fs
+        torchaudio.save(output_path, source_tensor, MODEL_SAMPLE_RATE)
+        sources_dict[source_key] = output_path
+
+    if not sources_dict:
+        raise RuntimeError("Model ran but failed to save any output files.")
+
+    print(f"✓ MultiDecoderDPRNN separation complete. Saved {list(sources_dict.keys())}")
+    return sources_dict

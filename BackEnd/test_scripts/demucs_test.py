@@ -7,9 +7,9 @@ os.environ["TORCHAUDIO_BACKEND"] = "soundfile"
 # This tells the system: "Don't use FFmpeg to save files, use Soundfile instead."
 # --- CONFIGURATION ---
 # The name of your local file
-INPUT_FILENAME = "audio_example.mp3"
+INPUT_FILENAME = r'..\input\music_test\1\mixture.wav'
 # The folder where results will be saved
-OUTPUT_FOLDER = "separated_results"
+OUTPUT_FOLDER = r'separated_results\1'
 # The model name (htdemucs = 4 stems: vocals, drums, bass, other)
 MODEL_NAME = "htdemucs"
 

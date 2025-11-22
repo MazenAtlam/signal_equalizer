@@ -7,7 +7,7 @@ import array
 # --- 1. CONFIGURATION ---
 
 # IMPORTANT: Ensure this path is correct relative to where you run the script.
-TEST_FILE_INPUT = 'input/input.wav' 
+TEST_FILE_INPUT = r'..\input\music_test\1\mixture.wav' 
 
 # Define the revised frequency ranges for separation (passbands)
 MUSICAL_SEPARATION_RANGES = {
@@ -96,7 +96,7 @@ def run_static_separation_test():
     full_fft_data = custom_fft(mix_time_series)
 
     for source_name, band in MUSICAL_SEPARATION_RANGES.items():
-        output_filename = f"output/equalizer/{source_name}.wav" # DISTINCT OUTPUT NAME
+        output_filename = f"../output/equalizer/2/{source_name}.wav" # DISTINCT OUTPUT NAME
         
         print(f"\n--- Isolating '{source_name}' ({band['freq_start_hz']} Hz - {band['freq_end_hz']} Hz) ---")
         
