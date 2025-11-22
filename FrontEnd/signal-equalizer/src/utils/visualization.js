@@ -216,9 +216,9 @@ export const drawSpectrogram = (canvas, spectrogramData, options = {}) => {
 
   // Draw labels
   ctx.fillStyle = options.labelColor || '#fff';
-  ctx.font = '12px Arial';
+  ctx.font = '15px Arial';
   ctx.textAlign = 'center';
-  ctx.fillText('Time', width / 2, height - 10);
+  ctx.fillText('Time', width /2, height - 10);
   
   ctx.save();
   ctx.translate(15, height / 2);

@@ -3,7 +3,12 @@ import Card from "./Card";
 import Button from "./Button";
 import { drawSpectrogram } from "../utils/visualization";
 
-const SpectrogramAnalyzer = ({ inputSpectrogram = [], outputSpectrogram = [], isVisible = true, onClose }) => {
+const SpectrogramAnalyzer = ({
+  inputSpectrogram = [],
+  outputSpectrogram = [],
+  isVisible = true,
+  onClose,
+}) => {
   const [hovered, setHovered] = useState(false);
   const inputCanvasRef = useRef(null);
   const outputCanvasRef = useRef(null);
@@ -16,7 +21,7 @@ const SpectrogramAnalyzer = ({ inputSpectrogram = [], outputSpectrogram = [], is
     if (inputSpectrogram.length > 0 && inputCanvasRef.current) {
       const canvas = inputCanvasRef.current;
       const container = canvas.parentElement;
-      
+
       if (container) {
         const rect = container.getBoundingClientRect();
         canvas.width = rect.width || 400;
@@ -34,7 +39,7 @@ const SpectrogramAnalyzer = ({ inputSpectrogram = [], outputSpectrogram = [], is
     if (outputSpectrogram.length > 0 && outputCanvasRef.current) {
       const canvas = outputCanvasRef.current;
       const container = canvas.parentElement;
-      
+
       if (container) {
         const rect = container.getBoundingClientRect();
         canvas.width = rect.width || 400;
@@ -49,7 +54,7 @@ const SpectrogramAnalyzer = ({ inputSpectrogram = [], outputSpectrogram = [], is
   }, [outputSpectrogram]);
 
   return (
-    <Card className="spectrogram-analyzer">
+    <Card className="spectrogram-analyzer col-10 mx-auto">
       <div className="d-flex justify-content-between pt-3 pe-4">
         <div className=" d-flex px-4 pt-2">
           <svg
@@ -100,9 +105,12 @@ const SpectrogramAnalyzer = ({ inputSpectrogram = [], outputSpectrogram = [], is
         </Button>
       </div>
       <div className="spectrogram-grid d-flex gap-3 px-5 my-4 ">
-        <Card className="spectrogram-panel col-6">
+        <Card className="spectrogram-panel col-6 ">
           <h6 className="panel-title px-4 py-2">Input Spectrogram</h6>
-          <div className="panel-content" style={{ width: "100%", height: "300px", position: "relative" }}>
+          <div
+            className="panel-content"
+            style={{ width: "100%", height: "300px", position: "relative" }}
+          >
             <canvas
               ref={inputCanvasRef}
               className="spectrogram-canvas"
@@ -110,9 +118,12 @@ const SpectrogramAnalyzer = ({ inputSpectrogram = [], outputSpectrogram = [], is
             ></canvas>
           </div>
         </Card>
-        <Card className="spectrogram-panel col-6">
+        <Card className="spectrogram-panel col-6 ">
           <h5 className="panel-title px-4 py-2">Output Spectrogram</h5>
-          <div className="panel-content" style={{ width: "100%", height: "300px", position: "relative" }}>
+          <div
+            className="panel-content"
+            style={{ width: "100%", height: "300px", position: "relative" }}
+          >
             <canvas
               ref={outputCanvasRef}
               className="spectrogram-canvas"

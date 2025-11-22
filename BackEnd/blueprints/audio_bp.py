@@ -11,9 +11,9 @@ import sys
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 sys.path.append(os.path.join(BASE_DIR, 'utils'))
 
-from audio_util import load_audio_to_numpy, save_numpy_to_wav
-from custom_fft import custom_fft, custom_ifft, get_fft_components
-from spectrogram import custom_spectrogram
+from utils.audio_util import load_audio_to_numpy, save_numpy_to_wav
+from utils.custom_fft import custom_fft, custom_ifft, get_fft_components
+from utils.spectrogram import custom_spectrogram
 
 audio_bp = Blueprint('audio_bp', __name__)
 
