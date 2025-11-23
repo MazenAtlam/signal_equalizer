@@ -3,7 +3,6 @@
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
 import os
 import uuid
-import numpy as np
 
 # --- 1. Utility Imports ---
 # Configure paths to import utils correctly
@@ -11,9 +10,9 @@ import sys
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 sys.path.append(os.path.join(BASE_DIR, 'utils'))
 
-from utils.audio_util import load_audio_to_numpy, save_numpy_to_wav
-from utils.custom_fft import custom_fft, custom_ifft, get_fft_components
-from utils.spectrogram import custom_spectrogram
+from audio_util import load_audio_to_numpy
+from custom_fft import custom_fft, get_fft_components
+from spectrogram import custom_spectrogram
 
 audio_bp = Blueprint('audio_bp', __name__)
 
@@ -67,20 +66,12 @@ def upload_signal():
         # 4. Clean up the original uploaded file
         os.remove(filepath)
         
-        # 5. Prepare data for React visualization (chunking for large arrays)
-        sample_step = max(1, len(signal_time_series) // 2000)
-        
         return jsonify({
-            'message': 'Signal loaded and processed successfully.',
             'signal_id': signal_id,
-            'Fs': Fs,
-            'duration': len(signal_time_series) / Fs,
-            'data': {
-                'full_time_series': signal_time_series.tolist(), # <-- UPDATED TO SEND FULL ARRAY
-                'frequencies': frequencies.tolist(),
-                'magnitudes_db': magnitudes_db.tolist(),
-                'spectrogram_data': spectrogram_matrix.tolist()
-            }
+            'time_series': signal_time_series.tolist(),
+            'frequency_arr': frequencies.tolist(),
+            'magnitude_arr': magnitudes_db.tolist(),
+            'spectrogram': spectrogram_matrix.tolist()
         }), 200
     
     
@@ -88,41 +79,3 @@ def upload_signal():
     except Exception as e:
         print(f"Server error during upload: {e}")
         return jsonify({'error': f'An unexpected error occurred: {str(e)}'}), 500
-
-
-# --- 4. /api/audio/download_output (GET) ---
-@audio_bp.route('/download_output', methods=['GET'])
-def download_output_signal():
-    signal_id = request.args.get('signal_id')
-    if not signal_id or signal_id not in SIGNAL_CACHE:
-        return jsonify({'error': 'Signal ID not found or invalid.'}), 404
-        
-    signal_data = SIGNAL_CACHE[signal_id]
-    
-    try:
-        # Generate temporary file path
-        output_filename = f"output_{signal_id}.wav"
-        output_filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], output_filename)
-        
-        # Save the current output signal array to a WAV file
-        save_numpy_to_wav(signal_data['current_signal'], signal_data['Fs'], output_filepath)
-
-        # Serve the file for streaming (playback in React)
-        response = send_from_directory(
-            directory=current_app.config['UPLOAD_FOLDER'],
-            path=output_filename,
-            as_attachment=False, 
-            mimetype='audio/wav'
-        )
-        
-        # Clean up the local WAV file after the request
-        @response.call_on_close
-        def cleanup():
-            if os.path.exists(output_filepath):
-                os.remove(output_filepath)
-        
-        return response
-        
-    except Exception as e:
-        print(f"Server error during download: {e}")
-        return jsonify({'error': f'An unexpected error occurred during audio output: {str(e)}'}), 500
