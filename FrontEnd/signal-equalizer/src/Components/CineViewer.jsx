@@ -12,6 +12,11 @@ const CineViewer = ({
   isPlaying = false,
   isVisible = true,
   onClose,
+  onPlay, // Add these callback props
+  onStop,
+  onReset,
+  onSpeedChange,
+  onTimeChange,
 }) => {
   const inputCanvasRef = useRef(null);
   const outputCanvasRef = useRef(null);
@@ -19,6 +24,7 @@ const CineViewer = ({
   const outputContainerRef = useRef(null);
   const [status, setStatus] = useState("Paused");
   const [hovered, setHovered] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1.0); // Add local state for playback rate
 
   if (!isVisible) {
     return null;
@@ -27,6 +33,17 @@ const CineViewer = ({
   useEffect(() => {
     setStatus(isPlaying ? "Playing" : "Paused");
   }, [isPlaying]);
+
+  // Calculate duration from the longer of input or output time series
+  const getDuration = () => {
+    const inputDuration =
+      inputTimeSeries.length > 0 ? inputTimeSeries.length / sampleRate : 0;
+    const outputDuration =
+      outputTimeSeries.length > 0 ? outputTimeSeries.length / sampleRate : 0;
+    return Math.max(inputDuration, outputDuration);
+  };
+
+  const duration = getDuration();
 
   const setupCanvas = (canvas, container, timeSeries) => {
     if (!canvas || !container) return;
@@ -53,11 +70,11 @@ const CineViewer = ({
 
       // Draw playback position if playing
       if (isPlaying) {
-        const duration = timeSeries.length / sampleRate;
-        if (duration > 0) {
+        const signalDuration = timeSeries.length / sampleRate;
+        if (signalDuration > 0) {
           const position = Math.min(
             1,
-            Math.max(0, playbackPosition / duration)
+            Math.max(0, playbackPosition / signalDuration)
           );
           drawPlaybackPosition(canvas, position);
         }
@@ -92,6 +109,49 @@ const CineViewer = ({
       );
     }
   }, [outputTimeSeries, playbackPosition, isPlaying, sampleRate]);
+
+  // Handle speed change locally if not provided via props
+  const handleSpeedChange = (newSpeed) => {
+    if (onSpeedChange) {
+      onSpeedChange(newSpeed);
+    } else {
+      setPlaybackRate(newSpeed);
+    }
+  };
+
+  // Handle time change locally if not provided via props
+  const handleTimeChange = (newTime) => {
+    if (onTimeChange) {
+      onTimeChange(newTime);
+    }
+    // If no onTimeChange prop provided, you might need to manage time state locally
+    console.log("Time change requested:", newTime);
+  };
+
+  // Default handlers if not provided
+  const handlePlay = () => {
+    if (onPlay) {
+      onPlay();
+    } else {
+      console.log("Play requested");
+    }
+  };
+
+  const handleStop = () => {
+    if (onStop) {
+      onStop();
+    } else {
+      console.log("Stop requested");
+    }
+  };
+
+  const handleReset = () => {
+    if (onReset) {
+      onReset();
+    } else {
+      console.log("Reset requested");
+    }
+  };
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -155,9 +215,9 @@ const CineViewer = ({
       </div>
       <div className="cine-grid px-4 d-flex gap-3 my-4">
         <Card className="cine-panel col-6">
-          <div className="panel-header d-flex align-items-center px-3 py-3">
+          <div className="panel-header d-flex justify-content-between align-items-center ps-4 pt-4 pb-2 col-9">
             <h4
-              className="panel-title m-0 h-6 col-7"
+              className="panel-title m-0 h-6 "
               style={{
                 fontSize: "13px",
               }}
@@ -188,7 +248,7 @@ const CineViewer = ({
             className="cine-content"
             style={{
               width: "100%",
-              height: "200px",
+              height: "300px",
               position: "relative",
               padding: "12px",
             }}
@@ -201,13 +261,13 @@ const CineViewer = ({
                 height: "100%",
                 display: "block",
                 borderRadius: "4px",
-                backgroundColor: "#f8f9fa", // Optional: Add background to see the canvas area
+                backgroundColor: "#2b2b2bff",
               }}
             ></canvas>
           </div>
         </Card>
         <Card className="cine-panel col-6">
-          <div className="panel-header d-flex align-items-center px-3 py-3">
+          <div className="panel-header d-flex  justify-content-between align-items-center ps-4 pt-4 pb-2 col-9">
             <h4
               className="panel-title m-0 h-6 col-7"
               style={{
@@ -240,7 +300,7 @@ const CineViewer = ({
             className="cine-content"
             style={{
               width: "100%",
-              height: "200px",
+              height: "300px",
               position: "relative",
               padding: "12px",
             }}
@@ -253,14 +313,25 @@ const CineViewer = ({
                 height: "100%",
                 display: "block",
                 borderRadius: "4px",
-                backgroundColor: "#f8f9fa", // Optional: Add background to see the canvas area
+                backgroundColor: "#242425ff",
               }}
             ></canvas>
           </div>
         </Card>
       </div>
       <Card className="cine-controls-panel mx-4 mb-4">
-        <PanelControls type="cine" />
+        <PanelControls
+          type="cine"
+          isPlaying={isPlaying}
+          currentTime={playbackPosition}
+          duration={duration}
+          playbackRate={playbackRate}
+          onPlay={handlePlay}
+          onStop={handleStop}
+          onReset={handleReset}
+          onSpeedChange={handleSpeedChange}
+          onTimeChange={handleTimeChange}
+        />
       </Card>
     </Card>
   );

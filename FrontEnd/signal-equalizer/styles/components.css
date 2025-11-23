@@ -288,3 +288,13 @@
   font-size: 10px;
   text-anchor: middle;
 }
+/* Optional: Style the resize handle */
+.generic-equalizer::-webkit-resizer {
+  background-color: #1FD5F9;
+  border-radius: 4px;
+}
+
+.generic-equalizer::-moz-resizer {
+  background-color: #1FD5F9;
+  border-radius: 4px;
+}
