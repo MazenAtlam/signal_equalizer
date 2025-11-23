@@ -18,157 +18,255 @@ const AudioPlayer = ({
     currentTime: 0,
     duration: inputDuration,
     playbackRate: 1.0,
+    error: null,
   });
   const [outputState, setOutputState] = useState({
     isPlaying: false,
     currentTime: 0,
     duration: outputDuration,
     playbackRate: 1.0,
+    error: null,
   });
 
   const inputAudioRef = useRef(null);
   const outputAudioRef = useRef(null);
-  const updateIntervalRef = useRef(null);
 
-  if (!isVisible) {
-    return null;
-  }
-
+  // Input audio effect - FIXED
   useEffect(() => {
-    if (inputAudioURL) {
-      const audio = new Audio(inputAudioURL);
-      inputAudioRef.current = audio;
+    if (!isVisible || !inputAudioURL) return;
 
-      audio.addEventListener("loadedmetadata", () => {
-        setInputState((prev) => ({ ...prev, duration: audio.duration }));
-      });
+    console.log("🎵 Initializing input audio...");
 
-      audio.addEventListener("timeupdate", () => {
-        const isPlaying = !audio.paused;
-        setInputState((prev) => ({
-          ...prev,
-          currentTime: audio.currentTime,
-          isPlaying,
-        }));
-        // Only update playback if input is playing
-        if (onPlaybackUpdate && isPlaying) {
-          onPlaybackUpdate(audio.currentTime, true);
-        }
-      });
+    // Define event handlers FIRST
+    const handleInputLoadedMetadata = () => {
+      console.log(
+        "✅ Input audio metadata loaded, duration:",
+        inputAudioRef.current?.duration
+      );
+      setInputState((prev) => ({
+        ...prev,
+        duration: inputAudioRef.current?.duration || inputDuration,
+        error: null,
+      }));
+    };
 
-      audio.addEventListener("play", () => {
-        setInputState((prev) => ({ ...prev, isPlaying: true }));
-        if (onPlaybackUpdate && inputAudioRef.current) {
-          onPlaybackUpdate(inputAudioRef.current.currentTime, true);
-        }
-      });
+    const handleInputTimeUpdate = () => {
+      const currentTime = inputAudioRef.current?.currentTime || 0;
+      const isPlaying = !inputAudioRef.current?.paused;
 
-      audio.addEventListener("pause", () => {
-        setInputState((prev) => ({ ...prev, isPlaying: false }));
-        // Only update if no other audio is playing
-        if (
-          onPlaybackUpdate &&
-          (!outputAudioRef.current || outputAudioRef.current.paused)
-        ) {
-          onPlaybackUpdate(inputAudioRef.current.currentTime, false);
-        }
-      });
+      setInputState((prev) => ({
+        ...prev,
+        currentTime: currentTime,
+        isPlaying: isPlaying,
+      }));
 
-      audio.addEventListener("ended", () => {
-        setInputState((prev) => ({
-          ...prev,
-          isPlaying: false,
-          currentTime: 0,
-        }));
-        if (
-          onPlaybackUpdate &&
-          (!outputAudioRef.current || outputAudioRef.current.paused)
-        ) {
-          onPlaybackUpdate(0, false);
-        }
-      });
-
-      return () => {
-        if (inputAudioRef.current) {
-          inputAudioRef.current.pause();
-          inputAudioRef.current = null;
-        }
-      };
-    }
-  }, [inputAudioURL, onPlaybackUpdate]);
-
-  useEffect(() => {
-    if (outputAudioURL) {
-      const audio = new Audio(outputAudioURL);
-      outputAudioRef.current = audio;
-
-      audio.addEventListener("loadedmetadata", () => {
-        setOutputState((prev) => ({ ...prev, duration: audio.duration }));
-      });
-
-      audio.addEventListener("timeupdate", () => {
-        const isPlaying = !audio.paused;
-        setOutputState((prev) => ({
-          ...prev,
-          currentTime: audio.currentTime,
-          isPlaying,
-        }));
-        // Only update playback if output is playing
-        if (onPlaybackUpdate && isPlaying) {
-          onPlaybackUpdate(audio.currentTime, true);
-        }
-      });
-
-      audio.addEventListener("play", () => {
-        setOutputState((prev) => ({ ...prev, isPlaying: true }));
-        if (onPlaybackUpdate && outputAudioRef.current) {
-          onPlaybackUpdate(outputAudioRef.current.currentTime, true);
-        }
-      });
-
-      audio.addEventListener("pause", () => {
-        setOutputState((prev) => ({ ...prev, isPlaying: false }));
-        // Only update if no other audio is playing
-        if (
-          onPlaybackUpdate &&
-          (!inputAudioRef.current || inputAudioRef.current.paused)
-        ) {
-          onPlaybackUpdate(outputAudioRef.current.currentTime, false);
-        }
-      });
-
-      audio.addEventListener("ended", () => {
-        setOutputState((prev) => ({
-          ...prev,
-          isPlaying: false,
-          currentTime: 0,
-        }));
-        if (
-          onPlaybackUpdate &&
-          (!inputAudioRef.current || inputAudioRef.current.paused)
-        ) {
-          onPlaybackUpdate(0, false);
-        }
-      });
-
-      return () => {
-        if (outputAudioRef.current) {
-          outputAudioRef.current.pause();
-          outputAudioRef.current = null;
-        }
-      };
-    }
-  }, [outputAudioURL, onPlaybackUpdate]);
-
-  const handleInputPlay = () => {
-    if (inputAudioRef.current) {
-      if (inputState.isPlaying) {
-        inputAudioRef.current.pause();
-        setInputState((prev) => ({ ...prev, isPlaying: false }));
-      } else {
-        inputAudioRef.current.play();
-        setInputState((prev) => ({ ...prev, isPlaying: true }));
+      if (onPlaybackUpdate && isPlaying) {
+        onPlaybackUpdate(currentTime, true);
       }
+    };
+
+    const handleInputError = (e) => {
+      console.error("❌ Input audio error:", e);
+      setInputState((prev) => ({
+        ...prev,
+        error: `Audio error: ${
+          inputAudioRef.current?.error?.message || "Unknown error"
+        }`,
+        isPlaying: false,
+      }));
+    };
+
+    // Store current playback state before cleanup
+    const wasPlaying = inputState.isPlaying;
+    const previousTime = inputState.currentTime;
+
+    // Clean up previous audio
+    if (inputAudioRef.current) {
+      inputAudioRef.current.pause();
+      inputAudioRef.current.removeEventListener(
+        "timeupdate",
+        handleInputTimeUpdate
+      );
+      inputAudioRef.current.removeEventListener(
+        "loadedmetadata",
+        handleInputLoadedMetadata
+      );
+      inputAudioRef.current.removeEventListener("error", handleInputError);
+      inputAudioRef.current = null;
+    }
+
+    // Create new audio element
+    const audio = new Audio(inputAudioURL);
+    inputAudioRef.current = audio;
+
+    // Add event listeners
+    audio.addEventListener("loadedmetadata", handleInputLoadedMetadata);
+    audio.addEventListener("timeupdate", handleInputTimeUpdate);
+    audio.addEventListener("error", handleInputError);
+
+    // Set properties and load
+    audio.preload = "metadata";
+
+    try {
+      audio.load();
+
+      // Restore previous playback state if it was playing
+      if (wasPlaying) {
+        audio.currentTime = previousTime;
+      }
+    } catch (error) {
+      console.error("Error loading input audio:", error);
+    }
+
+    return () => {
+      if (audio) {
+        audio.removeEventListener("loadedmetadata", handleInputLoadedMetadata);
+        audio.removeEventListener("timeupdate", handleInputTimeUpdate);
+        audio.removeEventListener("error", handleInputError);
+        // Only pause if the component is being completely unmounted
+        if (!isVisible) {
+          audio.pause();
+        }
+      }
+    };
+  }, [inputAudioURL, isVisible, inputDuration, onPlaybackUpdate]);
+
+  // Output audio effect - FIXED
+  useEffect(() => {
+    if (!isVisible || !outputAudioURL) return;
+
+    console.log("🎵 Initializing output audio...");
+
+    // Define event handlers FIRST
+    const handleOutputLoadedMetadata = () => {
+      console.log(
+        "✅ Output audio metadata loaded, duration:",
+        outputAudioRef.current?.duration
+      );
+      setOutputState((prev) => ({
+        ...prev,
+        duration: outputAudioRef.current?.duration || outputDuration,
+        error: null,
+      }));
+    };
+
+    const handleOutputTimeUpdate = () => {
+      const currentTime = outputAudioRef.current?.currentTime || 0;
+      const isPlaying = !outputAudioRef.current?.paused;
+
+      setOutputState((prev) => ({
+        ...prev,
+        currentTime: currentTime,
+        isPlaying: isPlaying,
+      }));
+
+      if (onPlaybackUpdate && isPlaying) {
+        onPlaybackUpdate(currentTime, true);
+      }
+    };
+
+    const handleOutputError = (e) => {
+      console.error("❌ Output audio error:", e);
+      setOutputState((prev) => ({
+        ...prev,
+        error: `Audio error: ${
+          outputAudioRef.current?.error?.message || "Unknown error"
+        }`,
+        isPlaying: false,
+      }));
+    };
+
+    // Store current playback state before cleanup
+    const wasPlaying = outputState.isPlaying;
+    const previousTime = outputState.currentTime;
+
+    // Clean up previous audio
+    if (outputAudioRef.current) {
+      outputAudioRef.current.pause();
+      outputAudioRef.current.removeEventListener(
+        "timeupdate",
+        handleOutputTimeUpdate
+      );
+      outputAudioRef.current.removeEventListener(
+        "loadedmetadata",
+        handleOutputLoadedMetadata
+      );
+      outputAudioRef.current.removeEventListener("error", handleOutputError);
+      outputAudioRef.current = null;
+    }
+
+    // Create new audio element
+    const audio = new Audio(outputAudioURL);
+    outputAudioRef.current = audio;
+
+    // Add event listeners
+    audio.addEventListener("loadedmetadata", handleOutputLoadedMetadata);
+    audio.addEventListener("timeupdate", handleOutputTimeUpdate);
+    audio.addEventListener("error", handleOutputError);
+
+    // Set properties and load
+    audio.preload = "metadata";
+
+    try {
+      audio.load();
+
+      // Restore previous playback state if it was playing
+      if (wasPlaying) {
+        audio.currentTime = previousTime;
+      }
+    } catch (error) {
+      console.error("Error loading output audio:", error);
+    }
+
+    return () => {
+      if (audio) {
+        audio.removeEventListener("loadedmetadata", handleOutputLoadedMetadata);
+        audio.removeEventListener("timeupdate", handleOutputTimeUpdate);
+        audio.removeEventListener("error", handleOutputError);
+        // Only pause if the component is being completely unmounted
+        if (!isVisible) {
+          audio.pause();
+        }
+      }
+    };
+  }, [outputAudioURL, isVisible, outputDuration, onPlaybackUpdate]);
+
+  // Control functions
+  const handleInputPlay = async () => {
+    console.log("▶️ Input play requested");
+    if (!inputAudioRef.current) {
+      console.error("❌ No input audio reference");
+      setInputState((prev) => ({ ...prev, error: "Audio not initialized" }));
+      return;
+    }
+
+    const audio = inputAudioRef.current;
+
+    try {
+      if (audio.paused) {
+        console.log("Starting playback...");
+
+        // Stop output if playing
+        if (outputAudioRef.current && !outputAudioRef.current.paused) {
+          console.log("Stopping output audio...");
+          outputAudioRef.current.pause();
+        }
+
+        await audio.play();
+        console.log("✅ Input audio play successful");
+        // Don't set isPlaying here - let the timeupdate event handle it
+      } else {
+        console.log("Pausing playback...");
+        audio.pause();
+        // Don't set isPlaying here - let the timeupdate event handle it
+      }
+    } catch (error) {
+      console.error("❌ Input audio play failed:", error);
+      setInputState((prev) => ({
+        ...prev,
+        error: `Play failed: ${error.message}`,
+        isPlaying: false,
+      }));
     }
   };
 
@@ -201,15 +299,41 @@ const AudioPlayer = ({
     }
   };
 
-  const handleOutputPlay = () => {
-    if (outputAudioRef.current) {
-      if (outputState.isPlaying) {
-        outputAudioRef.current.pause();
-        setOutputState((prev) => ({ ...prev, isPlaying: false }));
+  const handleOutputPlay = async () => {
+    console.log("▶️ Output play requested");
+    if (!outputAudioRef.current) {
+      console.error("❌ No output audio reference");
+      setOutputState((prev) => ({ ...prev, error: "Audio not initialized" }));
+      return;
+    }
+
+    const audio = outputAudioRef.current;
+
+    try {
+      if (audio.paused) {
+        console.log("Starting output playback...");
+
+        // Stop input if playing
+        if (inputAudioRef.current && !inputAudioRef.current.paused) {
+          console.log("Stopping input audio...");
+          inputAudioRef.current.pause();
+        }
+
+        await audio.play();
+        console.log("✅ Output audio play successful");
+        // Don't set isPlaying here - let the timeupdate event handle it
       } else {
-        outputAudioRef.current.play();
-        setOutputState((prev) => ({ ...prev, isPlaying: true }));
+        console.log("Pausing output playback...");
+        audio.pause();
+        // Don't set isPlaying here - let the timeupdate event handle it
       }
+    } catch (error) {
+      console.error("❌ Output audio play failed:", error);
+      setOutputState((prev) => ({
+        ...prev,
+        error: `Play failed: ${error.message}`,
+        isPlaying: false,
+      }));
     }
   };
 
@@ -242,6 +366,10 @@ const AudioPlayer = ({
     }
   };
 
+  if (!isVisible) {
+    return null;
+  }
+
   return (
     <Card className="audio-player col-10 mx-auto">
       <div className="audio-player-header d-flex justify-content-between pt-3 pe-4">
@@ -261,10 +389,20 @@ const AudioPlayer = ({
         </div>
         <Button
           variant="secondary"
-          className="close-btn border-0  "
+          className="close-btn border-0"
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
-          onClick={() => onClose && onClose()}
+          onClick={() => {
+            if (inputAudioRef.current) {
+              inputAudioRef.current.pause();
+              inputAudioRef.current = null;
+            }
+            if (outputAudioRef.current) {
+              outputAudioRef.current.pause();
+              outputAudioRef.current = null;
+            }
+            onClose && onClose();
+          }}
           style={
             hovered
               ? {
@@ -288,9 +426,32 @@ const AudioPlayer = ({
           </svg>
         </Button>
       </div>
+
+      {/* Error Display */}
+      {(inputState.error || outputState.error) && (
+        <div className="px-4 mt-3">
+          {inputState.error && (
+            <div className="alert alert-warning mb-2">
+              <strong>Input Audio Error:</strong> {inputState.error}
+            </div>
+          )}
+          {outputState.error && (
+            <div className="alert alert-warning mb-2">
+              <strong>Output Audio Error:</strong> {outputState.error}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="audio-players-grid px-4 d-flex gap-3 my-4">
         <Card className="audio-panel col-6">
           <h4 className="panel-title px-4 py-2">Input Audio</h4>
+          <div className="px-3 mb-2">
+            <small className="text-muted">
+              Duration: {inputState.duration.toFixed(2)}s | Current:{" "}
+              {inputState.currentTime.toFixed(2)}s
+            </small>
+          </div>
           <PanelControls
             type="audio"
             isPlaying={inputState.isPlaying}
@@ -306,6 +467,12 @@ const AudioPlayer = ({
         </Card>
         <Card className="audio-panel col-6">
           <h4 className="panel-title px-4 py-2">Output Audio</h4>
+          <div className="px-3 mb-2">
+            <small className="text-muted">
+              Duration: {outputState.duration.toFixed(2)}s | Current:{" "}
+              {outputState.currentTime.toFixed(2)}s
+            </small>
+          </div>
           <PanelControls
             type="audio"
             isPlaying={outputState.isPlaying}

@@ -84,59 +84,81 @@ const UploadCard = ({ onDataLoad, onError }) => {
   const handleLoadSampleData = async () => {
     setLoading(true);
 
-    // Use setTimeout to yield to the browser and prevent blocking
-    setTimeout(async () => {
-      try {
-        // Generate MINIMAL mock data
-        const mockData = generateMockAudioData(0.5, 11025); // Even smaller
+    try {
+      const mockData = generateMockAudioData(0.5, 11025);
+      const inputAudioURL = createAudioURL(
+        mockData.timeSeries,
+        mockData.sampleRate
+      );
+      const outputAudioURL = createAudioURL(
+        mockData.timeSeries,
+        mockData.sampleRate
+      );
+      const signalId = `mock_${Date.now()}`;
 
-        // Create audio URLs
-        const inputAudioURL = createAudioURL(
+      // ✅ Generate spectrogram data - try multiple approaches
+      let spectrogramData;
+
+      // Method 1: Use the same function as file upload if available
+      if (typeof generateQuickSpectrogram === "function") {
+        spectrogramData = generateQuickSpectrogram(
           mockData.timeSeries,
           mockData.sampleRate
         );
-        const outputAudioURL = createAudioURL(
-          mockData.timeSeries,
-          mockData.sampleRate
-        );
-
-        const signalId = `mock_${Date.now()}`;
-
-        if (onDataLoad) {
-          onDataLoad({
-            input: {
-              signal_id: signalId,
-              frequency_arr: mockData.frequencies || [],
-              magnitude_arr: mockData.magnitudes || [],
-              time_series: mockData.timeSeries,
-              audioURL: inputAudioURL,
-              Fs: mockData.sampleRate,
-              duration: mockData.timeSeries.length / mockData.sampleRate,
-              spectrogram_data: [], // EMPTY
-            },
-            output: {
-              signal_id: signalId,
-              frequency_arr: mockData.frequencies || [],
-              magnitude_arr: mockData.magnitudes || [],
-              time_series: mockData.timeSeries,
-              audioURL: outputAudioURL,
-              Fs: mockData.sampleRate,
-              duration: mockData.timeSeries.length / mockData.sampleRate,
-              spectrogram_data: [], // EMPTY
-            },
-          });
-        }
-      } catch (err) {
-        const errorMessage = err.message || "Failed to generate sample data";
-        console.error("Error loading sample data:", err);
-        showToast(errorMessage, "error");
-        if (onError) {
-          onError(errorMessage);
-        }
-      } finally {
-        setLoading(false);
       }
-    }, 100); // 100ms delay to let browser breathe
+      // Method 2: Create simple mock spectrogram data
+      else {
+        spectrogramData = [];
+        const timePoints = 50;
+        const freqBins = 30;
+
+        for (let t = 0; t < timePoints; t++) {
+          const frequencies = [];
+          for (let f = 0; f < freqBins; f++) {
+            // Create some pattern in the spectrogram
+            const value = Math.sin(t * 0.3) * Math.cos(f * 0.2) * 0.5 + 0.5;
+            frequencies.push(value);
+          }
+          spectrogramData.push(frequencies);
+        }
+      }
+
+      console.log("Sample spectrogram data generated:", spectrogramData.length);
+
+      if (onDataLoad) {
+        onDataLoad({
+          input: {
+            signal_id: signalId,
+            frequency_arr: mockData.frequencies || [],
+            magnitude_arr: mockData.magnitudes || [],
+            time_series: mockData.timeSeries,
+            audioURL: inputAudioURL,
+            Fs: mockData.sampleRate,
+            duration: mockData.timeSeries.length / mockData.sampleRate,
+            spectrogram_data: spectrogramData, // ✅ Now has real data
+          },
+          output: {
+            signal_id: signalId,
+            frequency_arr: mockData.frequencies || [],
+            magnitude_arr: mockData.magnitudes || [],
+            time_series: mockData.timeSeries,
+            audioURL: outputAudioURL,
+            Fs: mockData.sampleRate,
+            duration: mockData.timeSeries.length / mockData.sampleRate,
+            spectrogram_data: spectrogramData, // ✅ Now has real data
+          },
+        });
+      }
+    } catch (err) {
+      const errorMessage = err.message || "Failed to generate sample data";
+      console.error("Error loading sample data:", err);
+      showToast(errorMessage, "error");
+      if (onError) {
+        onError(errorMessage);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   // SIMPLIFIED spectrogram generation - much faster and less memory intensive
