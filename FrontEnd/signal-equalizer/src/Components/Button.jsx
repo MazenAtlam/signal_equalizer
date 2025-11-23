@@ -8,12 +8,12 @@ const Button = ({
   ...props
 }) => {
   const baseStyles =
-    "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50";
+    "inline-flex items-center justify-center gap-2 whitespace-nowrap text-md font-medium transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50";
 
   const variants = {
     default: "bg-black hover:bg-gray-50 text-gray-900",
     primary: "bg-gray-600 text-white hover:bg-blue-700",
-    secondary: "bg-gray-600 text-black hover:bg-gray-700",
+    secondary: "bg-gray-600 hover:bg-gray-700 ",
     ghost: "hover:bg-gray-100 text-gray-700",
   };
 
