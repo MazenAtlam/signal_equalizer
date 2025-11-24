@@ -32,11 +32,20 @@ const PanelControls = ({
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
   const progressRight = Math.max(0, 100 - progress);
 
-  // Speed control: 0.5x to 2.0x
-  const speedMin = 0.5;
+  // Speed control: 0.25x to 2.0x, snap to predefined stops
+  const speedSteps = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+  const speedMin = speedSteps[0];
   const speedMax = 2.0;
   const speedRange = speedMax - speedMin;
-  const speedProgress = ((playbackRate - speedMin) / speedRange) * 100;
+  const snapSpeed = (value) => {
+    const clamped = Math.min(speedMax, Math.max(speedMin, value));
+    return speedSteps.reduce((closest, step) =>
+      Math.abs(step - clamped) < Math.abs(closest - clamped) ? step : closest
+    );
+  };
+  const normalizedPlaybackRate = snapSpeed(playbackRate);
+  const speedProgress =
+    ((normalizedPlaybackRate - speedMin) / speedRange) * 100;
   const speedProgressRight = Math.max(0, 100 - speedProgress);
 
   const handleProgressClick = (e) => {
@@ -63,7 +72,7 @@ const PanelControls = ({
     const rect = speedRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percentage = Math.max(0, Math.min(1, x / rect.width));
-    const newSpeed = speedMin + percentage * speedRange;
+    const newSpeed = snapSpeed(speedMin + percentage * speedRange);
     onSpeedChange(newSpeed);
   };
 
@@ -72,7 +81,7 @@ const PanelControls = ({
     const rect = speedRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const percentage = Math.max(0, Math.min(1, x / rect.width));
-    const newSpeed = speedMin + percentage * speedRange;
+    const newSpeed = snapSpeed(speedMin + percentage * speedRange);
     onSpeedChange(newSpeed);
   };
 

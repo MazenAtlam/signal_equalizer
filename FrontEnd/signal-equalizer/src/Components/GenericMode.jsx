@@ -31,6 +31,7 @@ const GenericMode = () => {
 
   const handleDataLoad = (data) => {
     setAudioData(data);
+    console.log("Data load complete:" + data);
     setError(null);
     setPlaybackState({ currentTime: 0, isPlaying: false });
     // Keep viewers unchecked - user must manually check them to view
@@ -94,6 +95,10 @@ const GenericMode = () => {
               <SpectrogramAnalyzer
                 inputSpectrogram={audioData.input.spectrogram_data}
                 outputSpectrogram={audioData.output.spectrogram_data}
+                inputSampleRate={audioData.input.Fs}
+                outputSampleRate={audioData.output.Fs}
+                inputDuration={audioData.input.duration}
+                outputDuration={audioData.output.duration}
                 isVisible={viewerVisibility.spectrogramAnalyzer}
                 onClose={() => handleViewerClose("spectrogramAnalyzer")}
               />
