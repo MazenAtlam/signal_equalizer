@@ -483,12 +483,6 @@ const AudioPlayer = ({
       <div className="audio-players-grid px-4 d-flex gap-3 my-4">
         <Card className="audio-panel col-6">
           <h4 className="panel-title px-4 py-2">Input Audio</h4>
-          <div className="px-3 mb-2">
-            <small className="text-muted">
-              Duration: {inputState.duration.toFixed(2)}s | Current:{" "}
-              {inputState.currentTime.toFixed(2)}s
-            </small>
-          </div>
           <PanelControls
             type="audio"
             isPlaying={inputState.isPlaying}
@@ -504,12 +498,6 @@ const AudioPlayer = ({
         </Card>
         <Card className="audio-panel col-6">
           <h4 className="panel-title px-4 py-2">Output Audio</h4>
-          <div className="px-3 mb-2">
-            <small className="text-muted">
-              Duration: {outputState.duration.toFixed(2)}s | Current:{" "}
-              {outputState.currentTime.toFixed(2)}s
-            </small>
-          </div>
           <PanelControls
             type="audio"
             isPlaying={outputState.isPlaying}

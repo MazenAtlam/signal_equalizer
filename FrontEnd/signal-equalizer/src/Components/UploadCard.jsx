@@ -10,6 +10,53 @@ import {
 } from "../utils/audioUtils";
 import { useToast } from "./Toast";
 
+const toFiniteNumber = (value, fallback = 0) => {
+  const num =
+    typeof value === "number"
+      ? value
+      : value !== null && value !== undefined
+      ? Number(value)
+      : NaN;
+  return Number.isFinite(num) ? num : fallback;
+};
+
+const toIterableArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (ArrayBuffer.isView(value)) return Array.from(value);
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  if (value && typeof value === "object" && typeof value.length === "number") {
+    try {
+      return Array.from(value);
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const sanitizeNumericArray = (value) =>
+  toIterableArray(value)
+    .map((entry) =>
+      typeof entry === "number"
+        ? entry
+        : entry !== null && entry !== undefined
+        ? Number(entry)
+        : NaN
+    )
+    .filter((entry) => Number.isFinite(entry));
+
+const sanitizeMatrix = (matrix) =>
+  toIterableArray(matrix)
+    .map((row) => sanitizeNumericArray(row))
+    .filter((row) => row.length > 0);
+
 const UploadCard = ({ onDataLoad, onError }) => {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
@@ -19,6 +66,20 @@ const UploadCard = ({ onDataLoad, onError }) => {
   const generateQuickSpectrogram = (timeSeries, sampleRate) => {
     const numFrames = 50;
     const numFreqBins = 256;
+    const safeSeries = Array.isArray(timeSeries)
+      ? timeSeries
+      : ArrayBuffer.isView(timeSeries)
+      ? Array.from(timeSeries)
+      : [];
+    const averageEnergy =
+      safeSeries.length > 0
+        ? safeSeries.reduce((sum, sample) => sum + Math.abs(sample), 0) /
+          safeSeries.length
+        : 0;
+    const rateFactor =
+      Number.isFinite(sampleRate) && sampleRate > 0
+        ? sampleRate / 44100
+        : 1;
 
     const spectrogram = [];
 
@@ -29,11 +90,12 @@ const UploadCard = ({ onDataLoad, onError }) => {
         // Create a simple pattern that decreases with frequency
         const baseValue = -40 - (f / numFreqBins) * 40;
         // Add some time variation
-        const timeVariation = Math.sin(t * 0.2) * 10;
+        const timeVariation = Math.sin(t * 0.2 + averageEnergy) * 10;
+        const rateVariation = Math.cos((f / numFreqBins) * Math.PI * rateFactor) * 5;
         // Add some random noise
         const noise = (Math.random() - 0.5) * 5;
 
-        spectrogram[f][t] = baseValue + timeVariation + noise;
+        spectrogram[f][t] = baseValue + timeVariation + rateVariation + noise;
       }
     }
 
@@ -42,7 +104,6 @@ const UploadCard = ({ onDataLoad, onError }) => {
 
   // Helper function to generate mock frequency data if backend doesn't provide it
   const generateMockFrequencyData = (timeSeries, sampleRate) => {
-    const fftSize = 1024;
     const frequencies = [];
     const magnitudes = [];
 
@@ -82,31 +143,60 @@ const UploadCard = ({ onDataLoad, onError }) => {
         spectrogram_data_length: response.spectrogram_data?.length,
       });
 
-      // Create audio URL for playback
-      const inputAudioURL = URL.createObjectURL(file);
+      // Normalize core audio structures
+      const sanitizedResponse = {
+        signal_id: response.signal_id || null,
+        time_series: sanitizeNumericArray(response.time_series),
+        frequency_arr: sanitizeNumericArray(response.frequency_arr),
+        magnitude_arr: sanitizeNumericArray(response.magnitude_arr),
+        spectrogram_data: sanitizeMatrix(response.spectrogram_data),
+        Fs: toFiniteNumber(response.Fs, NaN),
+        duration: toFiniteNumber(response.duration, NaN),
+      };
 
-      // For output, we'll use the same data initially (before equalization)
-      // The backend returns the processed data
-      const outputAudioURL = createAudioURL(response.time_series, response.Fs);
+      let normalizedTimeSeries = sanitizedResponse.time_series;
+      let normalizedFs = sanitizedResponse.Fs;
+
+      if (!normalizedTimeSeries.length) {
+        console.warn(
+          "⚠️ Backend response missing time series data, deriving from uploaded file"
+        );
+        try {
+          const fallback = await audioFileToTimeSeries(file);
+          normalizedTimeSeries = fallback.timeSeries;
+          normalizedFs = fallback.sampleRate || normalizedFs;
+        } catch (deriveError) {
+          console.error("Failed to derive time series from file:", deriveError);
+        }
+      }
+
+      normalizedFs = Number.isFinite(normalizedFs) && normalizedFs > 0 ? normalizedFs : 44100;
+      const normalizedDuration =
+        (Number.isFinite(sanitizedResponse.duration) && sanitizedResponse.duration > 0
+          ? sanitizedResponse.duration
+          : null) ||
+        (normalizedTimeSeries.length > 0
+          ? normalizedTimeSeries.length / normalizedFs
+          : 0);
+
+      // Create audio URLs for playback
+      const inputAudioURL = URL.createObjectURL(file);
+      const outputAudioURL = normalizedTimeSeries.length
+        ? createAudioURL(normalizedTimeSeries, normalizedFs)
+        : inputAudioURL;
 
       // Generate frequency data if not provided by backend
-      let frequency_arr, magnitude_arr;
-      if (
-        response.frequency_arr &&
-        response.frequency_arr.length > 0 &&
-        response.magnitude_arr &&
-        response.magnitude_arr.length > 0
-      ) {
-        frequency_arr = response.frequency_arr;
-        magnitude_arr = response.magnitude_arr;
+      let frequency_arr = sanitizedResponse.frequency_arr;
+      let magnitude_arr = sanitizedResponse.magnitude_arr;
+      if (frequency_arr.length > 0 && magnitude_arr.length > 0) {
         console.log("✅ Using backend frequency data");
       } else {
         console.log(
           "🔄 Generating mock frequency data (backend didn't provide)"
         );
         const mockFreqData = generateMockFrequencyData(
-          response.time_series,
-          response.Fs
+          normalizedTimeSeries,
+          normalizedFs
         );
         frequency_arr = mockFreqData.frequencies;
         magnitude_arr = mockFreqData.magnitudes;
@@ -114,8 +204,9 @@ const UploadCard = ({ onDataLoad, onError }) => {
 
       // Generate spectrogram data if not provided
       const spectrogramData =
-        response.spectrogram_data ||
-        generateQuickSpectrogram(response.time_series, response.Fs);
+        sanitizedResponse.spectrogram_data.length > 0
+          ? sanitizedResponse.spectrogram_data
+          : generateQuickSpectrogram(normalizedTimeSeries, normalizedFs);
 
       console.log("📤 UPLOAD - Final Data Structure:", {
         inputAudioURL: !!inputAudioURL,
@@ -133,20 +224,20 @@ const UploadCard = ({ onDataLoad, onError }) => {
             signal_id: response.signal_id,
             frequency_arr: frequency_arr,
             magnitude_arr: magnitude_arr,
-            time_series: response.time_series,
+            time_series: normalizedTimeSeries,
             audioURL: inputAudioURL,
-            Fs: response.Fs,
-            duration: response.duration,
+            Fs: normalizedFs,
+            duration: normalizedDuration,
             spectrogram_data: spectrogramData,
           },
           output: {
             signal_id: response.signal_id,
             frequency_arr: frequency_arr,
             magnitude_arr: magnitude_arr,
-            time_series: response.time_series,
+            time_series: normalizedTimeSeries,
             audioURL: outputAudioURL,
-            Fs: response.Fs,
-            duration: response.duration,
+            Fs: normalizedFs,
+            duration: normalizedDuration,
             spectrogram_data: spectrogramData,
           },
         });

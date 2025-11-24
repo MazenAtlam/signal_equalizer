@@ -1,8 +1,13 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import Card from "./Card";
 import Button from "./Button";
 import PanelControls from "./PanelControls";
 import { drawWaveform, drawPlaybackPosition } from "../utils/visualization";
+
+const sanitizeNumericArray = (arr = []) =>
+  Array.isArray(arr)
+    ? arr.filter((value) => typeof value === "number" && Number.isFinite(value))
+    : [];
 
 const CineViewer = ({
   inputTimeSeries = [],
@@ -26,36 +31,50 @@ const CineViewer = ({
   const [hovered, setHovered] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1.0); // Add local state for playback rate
 
-  if (!isVisible) {
-    return null;
-  }
+  const sanitizedInputSeries = useMemo(
+    () => sanitizeNumericArray(inputTimeSeries),
+    [inputTimeSeries]
+  );
+  const sanitizedOutputSeries = useMemo(
+    () => sanitizeNumericArray(outputTimeSeries),
+    [outputTimeSeries]
+  );
+  const safeSampleRate = useMemo(
+    () => (Number.isFinite(sampleRate) && sampleRate > 0 ? sampleRate : 44100),
+    [sampleRate]
+  );
+  const safePlaybackPosition = Number.isFinite(playbackPosition)
+    ? playbackPosition
+    : 0;
 
   useEffect(() => {
     setStatus(isPlaying ? "Playing" : "Paused");
   }, [isPlaying]);
 
   // Calculate duration from the longer of input or output time series
-  const getDuration = () => {
+  const duration = useMemo(() => {
     const inputDuration =
-      inputTimeSeries.length > 0 ? inputTimeSeries.length / sampleRate : 0;
+      sanitizedInputSeries.length > 0
+        ? sanitizedInputSeries.length / safeSampleRate
+        : 0;
     const outputDuration =
-      outputTimeSeries.length > 0 ? outputTimeSeries.length / sampleRate : 0;
+      sanitizedOutputSeries.length > 0
+        ? sanitizedOutputSeries.length / safeSampleRate
+        : 0;
     return Math.max(inputDuration, outputDuration);
-  };
+  }, [sanitizedInputSeries, sanitizedOutputSeries, safeSampleRate]);
 
-  const duration = getDuration();
-
-  const setupCanvas = (canvas, container, timeSeries) => {
+  const setupCanvas = (canvas, container, timeSeries, sampleRate) => {
     if (!canvas || !container) return;
 
     // Get the content dimensions (excluding padding)
     const computedStyle = getComputedStyle(container);
     const paddingX =
-      parseFloat(computedStyle.paddingLeft) +
-      parseFloat(computedStyle.paddingRight);
+        parseFloat(computedStyle.paddingLeft) +
+        parseFloat(computedStyle.paddingRight);
     const paddingY =
-      parseFloat(computedStyle.paddingTop) +
-      parseFloat(computedStyle.paddingBottom);
+        parseFloat(computedStyle.paddingTop) +
+        parseFloat(computedStyle.paddingBottom);
 
     const contentWidth = container.clientWidth - paddingX;
     const contentHeight = container.clientHeight - paddingY;
@@ -66,15 +85,15 @@ const CineViewer = ({
 
     // Draw waveform if we have data
     if (timeSeries.length > 0) {
-      drawWaveform(canvas, timeSeries);
+      drawWaveform(canvas, timeSeries, sampleRate);
 
       // Draw playback position if playing
       if (isPlaying) {
         const signalDuration = timeSeries.length / sampleRate;
         if (signalDuration > 0) {
           const position = Math.min(
-            1,
-            Math.max(0, playbackPosition / signalDuration)
+              1,
+              Math.max(0, safePlaybackPosition / signalDuration)
           );
           drawPlaybackPosition(canvas, position);
         }
@@ -84,48 +103,63 @@ const CineViewer = ({
 
   useEffect(() => {
     if (
-      inputTimeSeries.length > 0 &&
-      inputCanvasRef.current &&
-      inputContainerRef.current
+        sanitizedInputSeries.length > 0 &&
+        inputCanvasRef.current &&
+        inputContainerRef.current
     ) {
       setupCanvas(
-        inputCanvasRef.current,
-        inputContainerRef.current,
-        inputTimeSeries
+          inputCanvasRef.current,
+          inputContainerRef.current,
+          sanitizedInputSeries,
+          safeSampleRate
       );
     }
-  }, [inputTimeSeries, playbackPosition, isPlaying, sampleRate]);
+  }, [
+    setupCanvas,
+    sanitizedInputSeries,
+    safePlaybackPosition,
+    isPlaying,
+    safeSampleRate,
+  ]);
 
   useEffect(() => {
     if (
-      outputTimeSeries.length > 0 &&
-      outputCanvasRef.current &&
-      outputContainerRef.current
+        sanitizedOutputSeries.length > 0 &&
+        outputCanvasRef.current &&
+        outputContainerRef.current
     ) {
       setupCanvas(
-        outputCanvasRef.current,
-        outputContainerRef.current,
-        outputTimeSeries
+          outputCanvasRef.current,
+          outputContainerRef.current,
+          sanitizedOutputSeries,
+          safeSampleRate
       );
     }
-  }, [outputTimeSeries, playbackPosition, isPlaying, sampleRate]);
+  }, [
+    setupCanvas,
+    sanitizedOutputSeries,
+    safePlaybackPosition,
+    isPlaying,
+    safeSampleRate,
+  ]);
 
   // Handle speed change locally if not provided via props
   const handleSpeedChange = (newSpeed) => {
+    const safeSpeed = Number.isFinite(newSpeed) ? newSpeed : 1;
     if (onSpeedChange) {
-      onSpeedChange(newSpeed);
+      onSpeedChange(safeSpeed);
     } else {
-      setPlaybackRate(newSpeed);
+      setPlaybackRate(safeSpeed);
     }
   };
 
   // Handle time change locally if not provided via props
   const handleTimeChange = (newTime) => {
+    const safeTime = Number.isFinite(newTime) ? newTime : 0;
     if (onTimeChange) {
-      onTimeChange(newTime);
+      onTimeChange(safeTime);
     }
-    // If no onTimeChange prop provided, you might need to manage time state locally
-    console.log("Time change requested:", newTime);
+    console.log("Time change requested:", safeTime);
   };
 
   // Default handlers if not provided
@@ -154,10 +188,17 @@ const CineViewer = ({
   };
 
   const formatTime = (seconds) => {
+    if (!Number.isFinite(seconds) || seconds < 0) {
+      return "0:00.00";
+    }
     const mins = Math.floor(seconds / 60);
     const secs = (seconds % 60).toFixed(2);
     return `${mins}:${secs.padStart(5, "0")}`;
   };
+
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <Card className="cine-viewer col-10 mx-auto">
@@ -239,7 +280,7 @@ const CineViewer = ({
                 }}
               >
                 <span>{status}</span> <span>Time:</span>{" "}
-                {formatTime(playbackPosition)}
+                {formatTime(safePlaybackPosition)}
               </span>
             </div>
           </div>
@@ -291,7 +332,7 @@ const CineViewer = ({
                 }}
               >
                 <span>{status}</span> <span>Time:</span>{" "}
-                {formatTime(playbackPosition)}
+                {formatTime(safePlaybackPosition)}
               </span>
             </div>
           </div>
