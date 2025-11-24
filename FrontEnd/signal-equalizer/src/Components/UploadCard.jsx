@@ -15,6 +15,54 @@ const UploadCard = ({ onDataLoad, onError }) => {
   const fileInputRef = useRef(null);
   const { showToast } = useToast();
 
+  // Move generateQuickSpectrogram to the TOP so it's available for both functions
+  const generateQuickSpectrogram = (timeSeries, sampleRate) => {
+    const numFrames = 50;
+    const numFreqBins = 256;
+
+    const spectrogram = [];
+
+    // Generate a simple mock spectrogram pattern
+    for (let f = 0; f < numFreqBins; f++) {
+      spectrogram[f] = new Array(numFrames);
+      for (let t = 0; t < numFrames; t++) {
+        // Create a simple pattern that decreases with frequency
+        const baseValue = -40 - (f / numFreqBins) * 40;
+        // Add some time variation
+        const timeVariation = Math.sin(t * 0.2) * 10;
+        // Add some random noise
+        const noise = (Math.random() - 0.5) * 5;
+
+        spectrogram[f][t] = baseValue + timeVariation + noise;
+      }
+    }
+
+    return spectrogram;
+  };
+
+  // Helper function to generate mock frequency data if backend doesn't provide it
+  const generateMockFrequencyData = (timeSeries, sampleRate) => {
+    const fftSize = 1024;
+    const frequencies = [];
+    const magnitudes = [];
+
+    // Generate simple frequency bins (0Hz to Nyquist frequency)
+    const nyquist = sampleRate / 2;
+    const numBins = 100;
+
+    for (let i = 0; i < numBins; i++) {
+      const freq = (i / numBins) * nyquist;
+      frequencies.push(freq);
+
+      // Simple mock magnitude that decreases with frequency
+      const baseMagnitude = -20 - (freq / nyquist) * 40;
+      const variation = Math.sin(freq * 0.01) * 10;
+      magnitudes.push(baseMagnitude + variation);
+    }
+
+    return { frequencies, magnitudes };
+  };
+
   const handleFileUpload = async (file) => {
     if (!file) return;
 
@@ -24,6 +72,16 @@ const UploadCard = ({ onDataLoad, onError }) => {
       // Upload file to backend API
       const response = await uploadAudio(file);
 
+      console.log("📤 UPLOAD - Backend Response:", {
+        signal_id: response.signal_id,
+        frequency_arr_length: response.frequency_arr?.length,
+        magnitude_arr_length: response.magnitude_arr?.length,
+        time_series_length: response.time_series?.length,
+        Fs: response.Fs,
+        duration: response.duration,
+        spectrogram_data_length: response.spectrogram_data?.length,
+      });
+
       // Create audio URL for playback
       const inputAudioURL = URL.createObjectURL(file);
 
@@ -31,20 +89,50 @@ const UploadCard = ({ onDataLoad, onError }) => {
       // The backend returns the processed data
       const outputAudioURL = createAudioURL(response.time_series, response.Fs);
 
+      // Generate frequency data if not provided by backend
+      let frequency_arr, magnitude_arr;
+      if (
+        response.frequency_arr &&
+        response.frequency_arr.length > 0 &&
+        response.magnitude_arr &&
+        response.magnitude_arr.length > 0
+      ) {
+        frequency_arr = response.frequency_arr;
+        magnitude_arr = response.magnitude_arr;
+        console.log("✅ Using backend frequency data");
+      } else {
+        console.log(
+          "🔄 Generating mock frequency data (backend didn't provide)"
+        );
+        const mockFreqData = generateMockFrequencyData(
+          response.time_series,
+          response.Fs
+        );
+        frequency_arr = mockFreqData.frequencies;
+        magnitude_arr = mockFreqData.magnitudes;
+      }
+
       // Generate spectrogram data if not provided
-      // For now, we'll create a simple spectrogram from the data
-      // In a real implementation, this would come from the backend
       const spectrogramData =
         response.spectrogram_data ||
         generateQuickSpectrogram(response.time_series, response.Fs);
+
+      console.log("📤 UPLOAD - Final Data Structure:", {
+        inputAudioURL: !!inputAudioURL,
+        outputAudioURL: !!outputAudioURL,
+        frequency_arr_length: frequency_arr.length,
+        magnitude_arr_length: magnitude_arr.length,
+        spectrogramDataLength: spectrogramData?.length,
+        time_series_length: response.time_series?.length,
+      });
 
       // Call callback with loaded data
       if (onDataLoad) {
         onDataLoad({
           input: {
             signal_id: response.signal_id,
-            frequency_arr: response.frequency_arr,
-            magnitude_arr: response.magnitude_arr,
+            frequency_arr: frequency_arr,
+            magnitude_arr: magnitude_arr,
             time_series: response.time_series,
             audioURL: inputAudioURL,
             Fs: response.Fs,
@@ -53,8 +141,8 @@ const UploadCard = ({ onDataLoad, onError }) => {
           },
           output: {
             signal_id: response.signal_id,
-            frequency_arr: response.frequency_arr,
-            magnitude_arr: response.magnitude_arr,
+            frequency_arr: frequency_arr,
+            magnitude_arr: magnitude_arr,
             time_series: response.time_series,
             audioURL: outputAudioURL,
             Fs: response.Fs,
@@ -65,6 +153,7 @@ const UploadCard = ({ onDataLoad, onError }) => {
       }
     } catch (err) {
       const errorMessage = err.message || "Failed to upload audio file";
+      console.error("File upload error:", err);
       showToast(errorMessage, "error");
       if (onError) {
         onError(errorMessage);
@@ -96,34 +185,21 @@ const UploadCard = ({ onDataLoad, onError }) => {
       );
       const signalId = `mock_${Date.now()}`;
 
-      // ✅ Generate spectrogram data - try multiple approaches
-      let spectrogramData;
+      // Generate spectrogram data
+      const spectrogramData = generateQuickSpectrogram(
+        mockData.timeSeries,
+        mockData.sampleRate
+      );
 
-      // Method 1: Use the same function as file upload if available
-      if (typeof generateQuickSpectrogram === "function") {
-        spectrogramData = generateQuickSpectrogram(
-          mockData.timeSeries,
-          mockData.sampleRate
-        );
-      }
-      // Method 2: Create simple mock spectrogram data
-      else {
-        spectrogramData = [];
-        const timePoints = 50;
-        const freqBins = 30;
-
-        for (let t = 0; t < timePoints; t++) {
-          const frequencies = [];
-          for (let f = 0; f < freqBins; f++) {
-            // Create some pattern in the spectrogram
-            const value = Math.sin(t * 0.3) * Math.cos(f * 0.2) * 0.5 + 0.5;
-            frequencies.push(value);
-          }
-          spectrogramData.push(frequencies);
-        }
-      }
-
-      console.log("Sample spectrogram data generated:", spectrogramData.length);
+      console.log("📊 SAMPLE - Data Structure:", {
+        frequenciesLength: mockData.frequencies?.length,
+        magnitudesLength: mockData.magnitudes?.length,
+        timeSeriesLength: mockData.timeSeries?.length,
+        sampleRate: mockData.sampleRate,
+        spectrogramDataLength: spectrogramData?.length,
+        inputAudioURL: !!inputAudioURL,
+        outputAudioURL: !!outputAudioURL,
+      });
 
       if (onDataLoad) {
         onDataLoad({
@@ -135,7 +211,7 @@ const UploadCard = ({ onDataLoad, onError }) => {
             audioURL: inputAudioURL,
             Fs: mockData.sampleRate,
             duration: mockData.timeSeries.length / mockData.sampleRate,
-            spectrogram_data: spectrogramData, // ✅ Now has real data
+            spectrogram_data: spectrogramData,
           },
           output: {
             signal_id: signalId,
@@ -145,7 +221,7 @@ const UploadCard = ({ onDataLoad, onError }) => {
             audioURL: outputAudioURL,
             Fs: mockData.sampleRate,
             duration: mockData.timeSeries.length / mockData.sampleRate,
-            spectrogram_data: spectrogramData, // ✅ Now has real data
+            spectrogram_data: spectrogramData,
           },
         });
       }
@@ -159,97 +235,6 @@ const UploadCard = ({ onDataLoad, onError }) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // SIMPLIFIED spectrogram generation - much faster and less memory intensive
-  const generateSimpleSpectrogram = (timeSeries, sampleRate) => {
-    const windowSize = 512; // Reduced from 1024
-    const overlap = 256; // Reduced from 512
-    const step = windowSize - overlap;
-
-    // Limit the number of frames to prevent memory issues
-    const maxFrames = 100;
-    const numFrames = Math.min(
-      Math.floor((timeSeries.length - overlap) / step),
-      maxFrames
-    );
-
-    const freqBins = windowSize / 2;
-
-    // Create smaller spectrogram array
-    const spectrogram = [];
-    for (let f = 0; f < freqBins; f++) {
-      spectrogram[f] = new Array(numFrames).fill(-80);
-    }
-
-    // Use requestAnimationFrame to avoid blocking the main thread
-    return new Promise((resolve) => {
-      const processFrame = (frameIndex) => {
-        if (frameIndex >= numFrames) {
-          resolve(spectrogram);
-          return;
-        }
-
-        const start = frameIndex * step;
-        const end = Math.min(start + windowSize, timeSeries.length);
-        const frame = timeSeries.slice(start, end);
-
-        // Pad if necessary
-        while (frame.length < windowSize) {
-          frame.push(0);
-        }
-
-        // Simple FFT approximation with performance optimizations
-        for (let f = 0; f < freqBins; f++) {
-          let real = 0;
-          let imag = 0;
-
-          // Use pre-calculated angles
-          const angleIncrement = (-2 * Math.PI * f) / windowSize;
-
-          for (let n = 0; n < windowSize; n++) {
-            const angle = angleIncrement * n;
-            real += frame[n] * Math.cos(angle);
-            imag += frame[n] * Math.sin(angle);
-          }
-
-          const magnitude = Math.sqrt(real * real + imag * imag);
-          const magnitudeDb = 20 * Math.log10(magnitude + 1e-12);
-          spectrogram[f][frameIndex] = Math.max(-80, magnitudeDb);
-        }
-
-        // Process next frame on next animation frame to avoid blocking
-        requestAnimationFrame(() => processFrame(frameIndex + 1));
-      };
-
-      // Start processing
-      processFrame(0);
-    });
-  };
-
-  // Alternative: EVEN SIMPLER spectrogram for immediate use
-  const generateQuickSpectrogram = (timeSeries, sampleRate) => {
-    const numFrames = 50;
-    const numFreqBins = 256;
-
-    const spectrogram = [];
-
-    // Generate a simple mock spectrogram pattern
-    for (let f = 0; f < numFreqBins; f++) {
-      spectrogram[f] = new Array(numFrames);
-      for (let t = 0; t < numFrames; t++) {
-        // Create a simple pattern that decreases with frequency
-        const baseValue = -40 - (f / numFreqBins) * 40;
-        // Add some time variation
-        const timeVariation = Math.sin(t * 0.2) * 10;
-        // Add some random noise
-        const noise = (Math.random() - 0.5) * 5;
-
-        spectrogram[f][t] = baseValue + timeVariation + noise;
-      }
-    }
-
-    return spectrogram;
   };
 
   return (

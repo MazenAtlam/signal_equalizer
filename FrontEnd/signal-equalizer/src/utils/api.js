@@ -16,7 +16,6 @@ export const uploadAudio = async (file) => {
       method: 'POST',
       body: formData,
     });
-    
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -25,16 +24,33 @@ export const uploadAudio = async (file) => {
 
     const data = await response.json();
     
-    // Transform backend response to expected format
-    return {
-      signal_id: data.signal_id,
-      frequency_arr: data.data.frequencies,
-      magnitude_arr: data.data.magnitudes_db,
-      time_series: data.data.full_time_series,
-      Fs: data.Fs,
-      duration: data.duration,
-      spectrogram_data: data.data.spectrogram_data,
-    };
+    console.log('Backend API response:', data); // Debug log to see actual response structure
+    
+    // Handle different possible response structures
+    // Option 1: Data is nested under 'data' property
+    if (data.data) {
+      return {
+        signal_id: data.signal_id,
+        frequency_arr: data.data.frequencies || [],
+        magnitude_arr: data.data.magnitudes_db || [],
+        time_series: data.data.full_time_series || [],
+        Fs: data.Fs,
+        duration: data.duration,
+        spectrogram_data: data.data.spectrogram_data || [],
+      };
+    }
+    // Option 2: Data is at the root level
+    else {
+      return {
+        signal_id: data.signal_id,
+        frequency_arr: data.frequencies || [],
+        magnitude_arr: data.magnitudes_db || [],
+        time_series: data.full_time_series || [],
+        Fs: data.Fs,
+        duration: data.duration,
+        spectrogram_data: data.spectrogram_data || [],
+      };
+    }
   } catch (error) {
     console.error('Error uploading audio:', error);
     throw error;
