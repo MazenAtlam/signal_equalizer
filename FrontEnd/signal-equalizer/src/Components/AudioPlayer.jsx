@@ -96,8 +96,6 @@ const AudioPlayer = ({
 
     // Clean up previous audio
     if (inputAudioRef.current) {
-      const wasPlaying = !inputAudioRef.current.paused;
-      const previousTime = inputAudioRef.current.currentTime;
 
       inputAudioRef.current.removeEventListener(
         "timeupdate",
@@ -217,8 +215,6 @@ const AudioPlayer = ({
 
     // Clean up previous audio
     if (outputAudioRef.current) {
-      const wasPlaying = !outputAudioRef.current.paused;
-      const previousTime = outputAudioRef.current.currentTime;
 
       outputAudioRef.current.removeEventListener(
         "timeupdate",
@@ -287,11 +283,8 @@ const AudioPlayer = ({
       if (audio.paused) {
         console.log("Starting input playback...");
 
-        // Stop output if playing
-        if (outputAudioRef.current && !outputAudioRef.current.paused) {
-          console.log("Stopping output audio...");
-          outputAudioRef.current.pause();
-        }
+        // REMOVED: Automatic stopping of output audio
+        // Let each audio play independently
 
         await audio.play();
         console.log("✅ Input audio play successful");
@@ -352,11 +345,8 @@ const AudioPlayer = ({
       if (audio.paused) {
         console.log("Starting output playback...");
 
-        // Stop input if playing
-        if (inputAudioRef.current && !inputAudioRef.current.paused) {
-          console.log("Stopping input audio...");
-          inputAudioRef.current.pause();
-        }
+        // REMOVED: Automatic stopping of input audio
+        // Let each audio play independently
 
         await audio.play();
         console.log("✅ Output audio play successful");
