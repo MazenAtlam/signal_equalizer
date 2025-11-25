@@ -17,7 +17,12 @@ const GenericMode = () => {
   const [audioData, setAudioData] = useState(null);
   const [error, setError] = useState(null);
   const { showToast } = useToast();
-  const [playbackState, setPlaybackState] = useState({
+  // Separate states for audio players and cine viewer
+  const [audioPlaybackState, setAudioPlaybackState] = useState({
+    currentTime: 0,
+    isPlaying: false,
+  });
+  const [cinePlaybackState, setCinePlaybackState] = useState({
     currentTime: 0,
     isPlaying: false,
   });
@@ -33,9 +38,9 @@ const GenericMode = () => {
     setAudioData(data);
     console.log("Data load complete:" + data);
     setError(null);
-    setPlaybackState({ currentTime: 0, isPlaying: false });
-    // Keep viewers unchecked - user must manually check them to view
-    // Viewers remain unchecked initially even after data is loaded
+    // Reset both playback states
+    setAudioPlaybackState({ currentTime: 0, isPlaying: false });
+    setCinePlaybackState({ currentTime: 0, isPlaying: false });
     showToast("Audio data loaded successfully", "success");
   };
 
@@ -45,19 +50,20 @@ const GenericMode = () => {
     showToast(errorMessage, "error");
   };
 
-  const handlePlaybackUpdate = (currentTime, isPlaying) => {
-    setPlaybackState({ currentTime, isPlaying });
+  const handleAudioPlaybackUpdate = (currentTime, isPlaying) => {
+    setAudioPlaybackState({ currentTime, isPlaying });
+  };
+
+  const handleCinePlaybackUpdate = (currentTime, isPlaying) => {
+    setCinePlaybackState({ currentTime, isPlaying });
   };
 
   const handleViewerVisibilityChange = (viewerName, isVisible) => {
-    // If trying to show a viewer but no audio data is loaded, show error and don't update state
     if (isVisible && !audioData) {
       showToast("Please upload an audio file or load sample data first", "error");
-      // Don't update state - checkbox will remain unchecked
       return;
     }
-    
-    // Update state only if allowed (either unchecking or checking with data)
+
     setViewerVisibility((prev) => ({
       ...prev,
       [viewerName]: isVisible,
@@ -72,70 +78,71 @@ const GenericMode = () => {
   };
 
   return (
-    <div className="signal-equalizer-app">
-      <Navbar />
-      <main className="equalizer-main">
-        <SelectViewer
-          viewerVisibility={viewerVisibility}
-          onVisibilityChange={handleViewerVisibilityChange}
-          hasAudioData={!!audioData}
-        />
-        <UploadCard onDataLoad={handleDataLoad} onError={handleError} />
-        {audioData && (
-          <>
-            {viewerVisibility.frequencyGraph && (
-              <FrequencyGraph
-                frequencies={audioData.input.frequency_arr}
-                magnitudes={audioData.input.magnitude_arr}
-                isVisible={viewerVisibility.frequencyGraph}
-                onClose={() => handleViewerClose("frequencyGraph")}
-              />
-            )}
-            {viewerVisibility.spectrogramAnalyzer && (
-              <SpectrogramAnalyzer
-                inputSpectrogram={audioData.input.spectrogram_data}
-                outputSpectrogram={audioData.output.spectrogram_data}
-                inputSampleRate={audioData.input.Fs}
-                outputSampleRate={audioData.output.Fs}
-                inputDuration={audioData.input.duration}
-                outputDuration={audioData.output.duration}
-                isVisible={viewerVisibility.spectrogramAnalyzer}
-                onClose={() => handleViewerClose("spectrogramAnalyzer")}
-              />
-            )}
-            {viewerVisibility.audioPlayer && (
-              <AudioPlayer
-                inputAudioURL={audioData.input.audioURL}
-                outputAudioURL={audioData.output.audioURL}
-                inputDuration={audioData.input.duration}
-                outputDuration={audioData.output.duration}
-                onPlaybackUpdate={handlePlaybackUpdate}
-                isVisible={viewerVisibility.audioPlayer}
-                onClose={() => handleViewerClose("audioPlayer")}
-              />
-            )}
-            {viewerVisibility.cineViewer && (
-              <CineViewer
-                inputTimeSeries={audioData.input.time_series}
-                outputTimeSeries={audioData.output.time_series}
-                sampleRate={audioData.input.Fs}
-                playbackPosition={playbackState.currentTime}
-                isPlaying={playbackState.isPlaying}
-                isVisible={viewerVisibility.cineViewer}
-                onClose={() => handleViewerClose("cineViewer")}
-              />
-            )}
-          </>
+      <div className="signal-equalizer-app">
+        <Navbar />
+        <main className="equalizer-main">
+          <SelectViewer
+              viewerVisibility={viewerVisibility}
+              onVisibilityChange={handleViewerVisibilityChange}
+              hasAudioData={!!audioData}
+          />
+          <UploadCard onDataLoad={handleDataLoad} onError={handleError} />
+          {audioData && (
+              <>
+                {viewerVisibility.frequencyGraph && (
+                    <FrequencyGraph
+                        frequencies={audioData.input.frequency_arr}
+                        magnitudes={audioData.input.magnitude_arr}
+                        isVisible={viewerVisibility.frequencyGraph}
+                        onClose={() => handleViewerClose("frequencyGraph")}
+                    />
+                )}
+                {viewerVisibility.spectrogramAnalyzer && (
+                    <SpectrogramAnalyzer
+                        inputSpectrogram={audioData.input.spectrogram_data}
+                        outputSpectrogram={audioData.output.spectrogram_data}
+                        inputSampleRate={audioData.input.Fs}
+                        outputSampleRate={audioData.output.Fs}
+                        inputDuration={audioData.input.duration}
+                        outputDuration={audioData.output.duration}
+                        isVisible={viewerVisibility.spectrogramAnalyzer}
+                        onClose={() => handleViewerClose("spectrogramAnalyzer")}
+                    />
+                )}
+                {viewerVisibility.audioPlayer && (
+                    <AudioPlayer
+                        inputAudioURL={audioData.input.audioURL}
+                        outputAudioURL={audioData.output.audioURL}
+                        inputDuration={audioData.input.duration}
+                        outputDuration={audioData.output.duration}
+                        onPlaybackUpdate={handleAudioPlaybackUpdate}
+                        isVisible={viewerVisibility.audioPlayer}
+                        onClose={() => handleViewerClose("audioPlayer")}
+                    />
+                )}
+                {viewerVisibility.cineViewer && (
+                    <CineViewer
+                        inputTimeSeries={audioData.input.time_series}
+                        outputTimeSeries={audioData.output.time_series}
+                        sampleRate={audioData.input.Fs}
+                        playbackPosition={cinePlaybackState.currentTime}
+                        isPlaying={cinePlaybackState.isPlaying}
+                        onPlaybackUpdate={handleCinePlaybackUpdate}
+                        isVisible={viewerVisibility.cineViewer}
+                        onClose={() => handleViewerClose("cineViewer")}
+                    />
+                )}
+              </>
+          )}
+        </main>
+        {viewerVisibility.genericEqualizer && (
+            <GenericEqualizer
+                isVisible={viewerVisibility.genericEqualizer}
+                onClose={() => handleViewerClose("genericEqualizer")}
+            />
         )}
-      </main>
-      {viewerVisibility.genericEqualizer && (
-        <GenericEqualizer
-          isVisible={viewerVisibility.genericEqualizer}
-          onClose={() => handleViewerClose("genericEqualizer")}
-        />
-      )}
-      <Footer />
-    </div>
+        <Footer />
+      </div>
   );
 };
 

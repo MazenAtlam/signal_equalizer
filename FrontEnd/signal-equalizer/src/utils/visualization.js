@@ -575,7 +575,7 @@ const getHeatMapColor = (value) => {
 };
 
 /**
- * Draw waveform with numbered axes
+ * Draw waveform with numbered axes and time window support
  * @param {HTMLCanvasElement} canvas - Canvas element
  * @param {Array<number>} timeSeries - Time series data
  * @param {number} sampleRate - Sample rate in Hz
@@ -598,15 +598,28 @@ export const drawWaveform = (canvas, timeSeries, sampleRate = 44100, options = {
   ctx.fillStyle = options.backgroundColor || '#1a1a1a';
   ctx.fillRect(0, 0, width, height);
 
-  // Calculate duration
-  const duration = timeSeries.length / sampleRate;
+  // Calculate time window
+  const totalDuration = timeSeries.length / sampleRate;
+  const startTime = options.startTime || 0;
+  const visibleDuration = options.visibleDuration || totalDuration;
+  const endTime = Math.min(startTime + visibleDuration, totalDuration);
+
+  // Calculate which samples to display
+  const startSample = Math.floor(startTime * sampleRate);
+  const endSample = Math.floor(endTime * sampleRate);
+  const visibleSamples = timeSeries.slice(
+      Math.max(0, startSample),
+      Math.min(timeSeries.length, endSample)
+  );
+
+  if (visibleSamples.length === 0) return;
 
   // Downsample if necessary for performance
   const maxSamples = plotWidth;
-  const step = Math.max(1, Math.floor(timeSeries.length / maxSamples));
+  const step = Math.max(1, Math.floor(visibleSamples.length / maxSamples));
   const samples = [];
-  for (let i = 0; i < timeSeries.length; i += step) {
-    samples.push(timeSeries[i]);
+  for (let i = 0; i < visibleSamples.length; i += step) {
+    samples.push(visibleSamples[i]);
   }
 
   // Find min/max for scaling
@@ -662,10 +675,10 @@ export const drawWaveform = (canvas, timeSeries, sampleRate = 44100, options = {
   ctx.font = '12px Arial';
   ctx.textAlign = 'center';
 
-  // X-axis labels (time)
+  // X-axis labels (time) - show actual time values in the visible window
   const timeSteps = 6;
   for (let i = 0; i <= timeSteps; i++) {
-    const timeValue = (i / timeSteps) * duration;
+    const timeValue = startTime + (i / timeSteps) * visibleDuration;
     const x = padding.left + (i / timeSteps) * plotWidth;
     ctx.fillText(timeValue.toFixed(2) + 's', x, height - padding.bottom + 20);
   }
