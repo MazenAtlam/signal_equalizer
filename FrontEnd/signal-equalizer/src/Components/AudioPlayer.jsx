@@ -319,8 +319,8 @@ const AudioPlayer = ({
 
   const handleInputReset = () => {
     if (inputAudioRef.current) {
-      inputAudioRef.current.currentTime = 0;
-      setInputState((prev) => ({ ...prev, currentTime: 0 }));
+      inputAudioRef.current.playbackRate = 1.0;
+      setInputState((prev) => ({ ...prev, playbackRate: 1.0 }));
     }
   };
 
@@ -384,8 +384,8 @@ const AudioPlayer = ({
 
   const handleOutputReset = () => {
     if (outputAudioRef.current) {
-      outputAudioRef.current.currentTime = 0;
-      setOutputState((prev) => ({ ...prev, currentTime: 0 }));
+      outputAudioRef.current.playbackRate = 1.0;
+      setOutputState((prev) => ({ ...prev, playbackRate: 1.0 }));
     }
   };
 

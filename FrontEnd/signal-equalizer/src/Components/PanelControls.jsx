@@ -7,16 +7,20 @@ const PanelControls = ({
   currentTime = 0,
   duration = 0,
   playbackRate = 1.0,
+  zoomLevel = 1.0,
   onPlay,
   onStop,
   onReset,
   onSpeedChange,
   onTimeChange,
+  onZoomChange,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isSpeedDragging, setIsSpeedDragging] = useState(false);
+  const [isZoomDragging, setIsZoomDragging] = useState(false);
   const progressRef = useRef(null);
   const speedRef = useRef(null);
+  const zoomRef = useRef(null);
 
   const [resetHovered, setResetHovered] = useState(false);
   const [stopHovered, setStopHovered] = useState(false);
@@ -29,6 +33,7 @@ const PanelControls = ({
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  // Progress calculations for audio controls
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
   const progressRight = Math.max(0, 100 - progress);
 
@@ -47,6 +52,14 @@ const PanelControls = ({
   const speedProgress =
     ((normalizedPlaybackRate - speedMin) / speedRange) * 100;
   const speedProgressRight = Math.max(0, 100 - speedProgress);
+
+  // Zoom control: 0.1x to 10x
+  const zoomMin = 0.1;
+  const zoomMax = 10;
+  const zoomRange = zoomMax - zoomMin;
+  const normalizedZoomLevel = Math.min(zoomMax, Math.max(zoomMin, zoomLevel));
+  const zoomProgress = ((normalizedZoomLevel - zoomMin) / zoomRange) * 100;
+  const zoomProgressRight = Math.max(0, 100 - zoomProgress);
 
   const handleProgressClick = (e) => {
     if (!progressRef.current || !onTimeChange || duration === 0) return;
@@ -85,10 +98,39 @@ const PanelControls = ({
     onSpeedChange(newSpeed);
   };
 
+  const handleZoomClick = (e) => {
+    if (!zoomRef.current || !onZoomChange) return;
+    const rect = zoomRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percentage = Math.max(0, Math.min(1, x / rect.width));
+    const newZoom = zoomMin + percentage * zoomRange;
+    onZoomChange(newZoom);
+  };
+
+  const handleZoomDrag = (e) => {
+    if (!isZoomDragging || !zoomRef.current || !onZoomChange) return;
+    const rect = zoomRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percentage = Math.max(0, Math.min(1, x / rect.width));
+    const newZoom = zoomMin + percentage * zoomRange;
+    onZoomChange(newZoom);
+  };
+
+  const handleZoomIn = () => {
+    const newZoom = Math.min(zoomMax, zoomLevel * 1.5);
+    onZoomChange(newZoom);
+  };
+
+  const handleZoomOut = () => {
+    const newZoom = Math.max(zoomMin, zoomLevel / 1.5);
+    onZoomChange(newZoom);
+  };
+
   useEffect(() => {
     const handleMouseUp = () => {
       setIsDragging(false);
       setIsSpeedDragging(false);
+      setIsZoomDragging(false);
     };
 
     const handleMouseMove = (e) => {
@@ -98,9 +140,12 @@ const PanelControls = ({
       if (isSpeedDragging) {
         handleSpeedDrag(e);
       }
+      if (isZoomDragging) {
+        handleZoomDrag(e);
+      }
     };
 
-    if (isDragging || isSpeedDragging) {
+    if (isDragging || isSpeedDragging || isZoomDragging) {
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
       return () => {
@@ -108,7 +153,7 @@ const PanelControls = ({
         document.removeEventListener("mouseup", handleMouseUp);
       };
     }
-  }, [isDragging, isSpeedDragging]);
+  }, [isDragging, isSpeedDragging, isZoomDragging]);
 
   if (type === "audio") {
     return (
@@ -409,12 +454,12 @@ const PanelControls = ({
     );
   }
 
-  // Cine controls - matching audio controls styling
+  // Cine controls - with zoom instead of progress bar
   return (
     <div className="cine-controls" style={{ padding: "1rem" }}>
-      {/* Progress bar row */}
+      {/* Zoom controls row */}
       <div
-        className="progress-bar"
+        className="zoom-controls"
         style={{
           display: "flex",
           justifyContent: "space-between",
@@ -424,72 +469,112 @@ const PanelControls = ({
         }}
       >
         <span
-          className="time-start"
-          style={{ minWidth: "50px", textAlign: "left" }}
+          className="zoom-label"
+          style={{ minWidth: "50px", textAlign: "left", fontSize: "0.875rem" }}
         >
-          {formatTime(currentTime)}
+          Zoom:
         </span>
         <div
-          ref={progressRef}
-          className="slider-container"
+          className="zoom-control-group"
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
             flex: 1,
-            width: "125px",
-            position: "relative",
-            height: "20px",
-            cursor: "pointer",
-          }}
-          onClick={handleProgressClick}
-          onMouseDown={(e) => {
-            setIsDragging(true);
-            handleProgressClick(e);
           }}
         >
-          <div
-            className="slider-track"
+          <Button
+            variant="secondary"
+            className="zoom-out-btn"
+            onClick={handleZoomOut}
             style={{
-              position: "absolute",
-              top: "50%",
-              left: 0,
-              right: 0,
-              height: "6px",
-              transform: "translateY(-50%)",
-              borderRadius: "5px",
+              backgroundColor: "transparent",
+              border: "1px solid #666",
+              borderRadius: "4px",
+              padding: "4px 8px",
+              color: "#FFF",
+              fontSize: "0.875rem",
+            }}
+          >
+            -
+          </Button>
+          <div
+            ref={zoomRef}
+            className="slider-container"
+            style={{
+              flex: 1,
+              position: "relative",
+              height: "20px",
+              cursor: "pointer",
+            }}
+            onClick={handleZoomClick}
+            onMouseDown={(e) => {
+              setIsZoomDragging(true);
+              handleZoomClick(e);
             }}
           >
             <div
-              className="slider-progress"
+              className="slider-track"
               style={{
                 position: "absolute",
-                top: 0,
-                right: `${progressRight}%`,
+                top: "50%",
                 left: 0,
-                height: "100%",
-                backgroundColor: "#1FD5F9",
+                right: 0,
+                height: "6px",
+                backgroundColor: "#333",
+                transform: "translateY(-50%)",
                 borderRadius: "5px",
+              }}
+            >
+              <div
+                className="slider-progress"
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  right: `${zoomProgressRight}%`,
+                  left: 0,
+                  height: "100%",
+                  backgroundColor: "#1FD5F9",
+                  borderRadius: "2px",
+                }}
+              ></div>
+            </div>
+            <div
+              className="slider-thumb"
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: `${zoomProgress}%`,
+                width: "15px",
+                height: "15px",
+                backgroundColor: "#080808ff",
+                borderRadius: "50%",
+                transform: "translate(-50%, -50%)",
+                cursor: "grab",
               }}
             ></div>
           </div>
-          <div
-            className="slider-thumb"
+          <Button
+            variant="secondary"
+            className="zoom-in-btn"
+            onClick={handleZoomIn}
             style={{
-              position: "absolute",
-              top: "50%",
-              left: `${progress}%`,
-              width: "15px",
-              height: "15px",
-              backgroundColor: "#080808ff",
-              borderRadius: "50%",
-              transform: "translate(-50%, -50%)",
-              cursor: "grab",
+              backgroundColor: "transparent",
+              border: "1px solid #666",
+              borderRadius: "4px",
+              padding: "4px 8px",
+              color: "#FFF",
+              fontSize: "0.875rem",
             }}
-          ></div>
+          >
+            +
+          </Button>
         </div>
         <span
-          className="time-end"
-          style={{ minWidth: "50px", textAlign: "right" }}
+          className="zoom-value"
+          style={{ minWidth: "50px", textAlign: "right", fontSize: "0.875rem" }}
         >
-          {formatTime(duration)}
+          {zoomLevel.toFixed(1)}x
         </span>
       </div>
 
