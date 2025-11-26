@@ -2,18 +2,22 @@ import React, { useState, useRef, useEffect } from "react";
 import Button from "./Button";
 
 const PanelControls = ({
-  type = "audio",
-  isPlaying = false,
-  currentTime = 0,
-  duration = 0,
-  playbackRate = 1.0,
-  zoomLevel = 1.0,
-  onPlay,
-  onStop,
-  onReset,
-  onSpeedChange,
-  onTimeChange,
-  onZoomChange,
+                           type = "audio",
+                           isPlaying = false,
+                           currentTime = 0,
+                           duration = 0,
+                           playbackRate = 1.0,
+                           zoomLevel = 1.0,
+                           onPlay,
+                           onStop,
+                           onReset,
+                           onSpeedChange,
+                           onTimeChange,
+                           onZoomChange,
+                           onZoomIn,        // Add this
+                           onZoomOut,       // Add this
+                           isZoomInDisabled = false,  // Add this
+                           isZoomOutDisabled = false, // Add this
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isSpeedDragging, setIsSpeedDragging] = useState(false);
@@ -113,16 +117,6 @@ const PanelControls = ({
     const x = e.clientX - rect.left;
     const percentage = Math.max(0, Math.min(1, x / rect.width));
     const newZoom = zoomMin + percentage * zoomRange;
-    onZoomChange(newZoom);
-  };
-
-  const handleZoomIn = () => {
-    const newZoom = Math.min(zoomMax, zoomLevel * 1.5);
-    onZoomChange(newZoom);
-  };
-
-  const handleZoomOut = () => {
-    const newZoom = Math.max(zoomMin, zoomLevel / 1.5);
     onZoomChange(newZoom);
   };
 
@@ -457,126 +451,132 @@ const PanelControls = ({
   // Cine controls - with zoom instead of progress bar
   return (
     <div className="cine-controls" style={{ padding: "1rem" }}>
-      {/* Zoom controls row */}
-      <div
-        className="zoom-controls"
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "10px",
-          marginBottom: "1rem",
-        }}
-      >
+        {/* Zoom controls row */}
+        <div
+            className="zoom-controls"
+            style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "10px",
+                marginBottom: "1rem",
+            }}
+        >
         <span
-          className="zoom-label"
-          style={{ minWidth: "50px", textAlign: "left", fontSize: "0.875rem" }}
+            className="zoom-label"
+            style={{ minWidth: "50px", textAlign: "left", fontSize: "0.875rem" }}
         >
           Zoom:
         </span>
-        <div
-          className="zoom-control-group"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            flex: 1,
-          }}
-        >
-          <Button
-            variant="secondary"
-            className="zoom-out-btn"
-            onClick={handleZoomOut}
-            style={{
-              backgroundColor: "transparent",
-              border: "1px solid #666",
-              borderRadius: "4px",
-              padding: "4px 8px",
-              color: "#FFF",
-              fontSize: "0.875rem",
-            }}
-          >
-            -
-          </Button>
-          <div
-            ref={zoomRef}
-            className="slider-container"
-            style={{
-              flex: 1,
-              position: "relative",
-              height: "20px",
-              cursor: "pointer",
-            }}
-            onClick={handleZoomClick}
-            onMouseDown={(e) => {
-              setIsZoomDragging(true);
-              handleZoomClick(e);
-            }}
-          >
             <div
-              className="slider-track"
-              style={{
-                position: "absolute",
-                top: "50%",
-                left: 0,
-                right: 0,
-                height: "6px",
-                backgroundColor: "#333",
-                transform: "translateY(-50%)",
-                borderRadius: "5px",
-              }}
-            >
-              <div
-                className="slider-progress"
+                className="zoom-control-group"
                 style={{
-                  position: "absolute",
-                  top: 0,
-                  right: `${zoomProgressRight}%`,
-                  left: 0,
-                  height: "100%",
-                  backgroundColor: "#1FD5F9",
-                  borderRadius: "2px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    flex: 1,
                 }}
-              ></div>
+            >
+                <Button
+                    variant="secondary"
+                    className="zoom-out-btn"
+                    onClick={onZoomOut}
+                    disabled={isZoomOutDisabled}
+                    style={{
+                        backgroundColor: isZoomOutDisabled ? "#333" : "transparent",
+                        border: `1px solid ${isZoomOutDisabled ? "#666" : "#666"}`,
+                        borderRadius: "4px",
+                        padding: "4px 8px",
+                        color: isZoomOutDisabled ? "#888" : "#FFF",
+                        fontSize: "0.875rem",
+                        cursor: isZoomOutDisabled ? "not-allowed" : "pointer",
+                        opacity: isZoomOutDisabled ? 0.5 : 1,
+                    }}
+                >
+                    -
+                </Button>
+                <div
+                    ref={zoomRef}
+                    className="slider-container"
+                    style={{
+                        flex: 1,
+                        position: "relative",
+                        height: "20px",
+                        cursor: "pointer",
+                    }}
+                    onClick={handleZoomClick}
+                    onMouseDown={(e) => {
+                        setIsZoomDragging(true);
+                        handleZoomClick(e);
+                    }}
+                >
+                    <div
+                        className="slider-track"
+                        style={{
+                            position: "absolute",
+                            top: "50%",
+                            left: 0,
+                            right: 0,
+                            height: "6px",
+                            backgroundColor: "#333",
+                            transform: "translateY(-50%)",
+                            borderRadius: "5px",
+                        }}
+                    >
+                        <div
+                            className="slider-progress"
+                            style={{
+                                position: "absolute",
+                                top: 0,
+                                right: `${zoomProgressRight}%`,
+                                left: 0,
+                                height: "100%",
+                                backgroundColor: "#1FD5F9",
+                                borderRadius: "2px",
+                            }}
+                        ></div>
+                    </div>
+                    <div
+                        className="slider-thumb"
+                        style={{
+                            position: "absolute",
+                            top: "50%",
+                            left: `${zoomProgress}%`,
+                            width: "15px",
+                            height: "15px",
+                            backgroundColor: "#080808ff",
+                            borderRadius: "50%",
+                            transform: "translate(-50%, -50%)",
+                            cursor: "grab",
+                        }}
+                    ></div>
+                </div>
+                <Button
+                    variant="secondary"
+                    className="zoom-in-btn"
+                    onClick={onZoomIn}
+                    disabled={isZoomInDisabled}
+                    style={{
+                        backgroundColor: isZoomInDisabled ? "#333" : "transparent",
+                        border: `1px solid ${isZoomInDisabled ? "#666" : "#666"}`,
+                        borderRadius: "4px",
+                        padding: "4px 8px",
+                        color: isZoomInDisabled ? "#888" : "#FFF",
+                        fontSize: "0.875rem",
+                        cursor: isZoomInDisabled ? "not-allowed" : "pointer",
+                        opacity: isZoomInDisabled ? 0.5 : 1,
+                    }}
+                >
+                    +
+                </Button>
             </div>
-            <div
-              className="slider-thumb"
-              style={{
-                position: "absolute",
-                top: "50%",
-                left: `${zoomProgress}%`,
-                width: "15px",
-                height: "15px",
-                backgroundColor: "#080808ff",
-                borderRadius: "50%",
-                transform: "translate(-50%, -50%)",
-                cursor: "grab",
-              }}
-            ></div>
-          </div>
-          <Button
-            variant="secondary"
-            className="zoom-in-btn"
-            onClick={handleZoomIn}
-            style={{
-              backgroundColor: "transparent",
-              border: "1px solid #666",
-              borderRadius: "4px",
-              padding: "4px 8px",
-              color: "#FFF",
-              fontSize: "0.875rem",
-            }}
-          >
-            +
-          </Button>
-        </div>
-        <span
-          className="zoom-value"
-          style={{ minWidth: "50px", textAlign: "right", fontSize: "0.875rem" }}
-        >
+            <span
+                className="zoom-value"
+                style={{ minWidth: "50px", textAlign: "right", fontSize: "0.875rem" }}
+            >
           {zoomLevel.toFixed(1)}x
         </span>
-      </div>
+        </div>
 
       {/* Controls row */}
       <div
