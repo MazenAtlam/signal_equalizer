@@ -65,13 +65,14 @@ def upload_signal():
         
         # 4. Clean up the original uploaded file
         os.remove(filepath)
-        
+
         return jsonify({
             'signal_id': signal_id,
             'time_series': signal_time_series.tolist(),
             'frequency_arr': frequencies.tolist(),
             'magnitude_arr': magnitudes_db.tolist(),
-            'spectrogram': spectrogram_matrix.tolist()
+            'spectrogram': spectrogram_matrix.tolist(),
+            'Fs': Fs
         }), 200
     
     

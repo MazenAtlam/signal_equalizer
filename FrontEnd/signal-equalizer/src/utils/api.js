@@ -1,15 +1,15 @@
 // API utility module for backend communication
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+    import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 const toNumber = (value, fallback = 0) => {
   const num =
-    typeof value === "number"
-      ? value
-      : value !== null && value !== undefined
-      ? Number(value)
-      : NaN;
+      typeof value === "number"
+          ? value
+          : value !== null && value !== undefined
+              ? Number(value)
+              : NaN;
   return Number.isFinite(num) ? num : fallback;
 };
 
@@ -36,25 +36,25 @@ const toIterableArray = (value) => {
 
 const toNumberArray = (arr = []) => {
   return toIterableArray(arr)
-    .map((value) => toNumber(value, NaN))
-    .filter((value) => Number.isFinite(value));
+      .map((value) => toNumber(value, NaN))
+      .filter((value) => Number.isFinite(value));
 };
 
 const toNumberMatrix = (matrix = []) => {
   return toIterableArray(matrix)
-    .map((row) => toNumberArray(row))
-    .filter((row) => row.length > 0);
+      .map((row) => toNumberArray(row))
+      .filter((row) => row.length > 0);
 };
 
 const normalizeApiPayload = (payload = {}) => {
   const timeSeries = toNumberArray(
-    payload.full_time_series || payload.time_series || []
+      payload.full_time_series || payload.time_series || []
   );
   const sampleRate = toNumber(payload.Fs, 44100);
   const inferredDuration =
-    timeSeries.length > 0 && sampleRate > 0
-      ? timeSeries.length / sampleRate
-      : 0;
+      timeSeries.length > 0 && sampleRate > 0
+          ? timeSeries.length / sampleRate
+          : 0;
 
   return {
     signal_id: payload.signal_id || payload.id || null,
@@ -64,7 +64,7 @@ const normalizeApiPayload = (payload = {}) => {
     Fs: sampleRate,
     duration: toNumber(payload.duration, inferredDuration),
     spectrogram_data: toNumberMatrix(
-      payload.spectrogram_data || payload.spectrogram || []
+        payload.spectrogram_data || payload.spectrogram || []
     ),
   };
 };
@@ -86,36 +86,45 @@ export const uploadAudio = async (file) => {
 
     if (!response.ok) {
       const errorData = await response
-        .json()
-        .catch(() => ({ error: "Unknown error" }));
+          .json()
+          .catch(() => ({ error: "Unknown error" }));
       throw new Error(
-        errorData.error || `HTTP error! status: ${response.status}`
+          errorData.error || `HTTP error! status: ${response.status}`
       );
     }
 
     const data = await response.json();
 
+    // FIXED: Correctly mapping backend keys (right side) to payload keys
     const payload = data?.data
-      ? {
+        ? {
           signal_id: data.signal_id ?? data.data.signal_id,
-          frequencies: data.data.frequencies,
-          magnitudes_db: data.data.magnitudes_db,
-          full_time_series: data.data.full_time_series,
+          frequencies: data.data.frequency_arr || data.data.frequencies,
+          magnitudes_db: data.data.magnitude_arr || data.data.magnitudes_db,
+          full_time_series: data.data.time_series || data.data.full_time_series,
           Fs: data.data.Fs ?? data.Fs,
           duration: data.data.duration ?? data.duration,
-          spectrogram_data: data.data.spectrogram_data,
+          spectrogram_data: data.data.spectrogram || data.data.spectrogram_data,
         }
-      : {
+        : {
           signal_id: data.signal_id,
-          frequencies: data.frequencies,
-          magnitudes_db: data.magnitudes_db,
-          full_time_series: data.full_time_series,
+          frequencies: data.frequency_arr || data.frequencies,
+          magnitudes_db: data.magnitude_arr || data.magnitudes_db,
+          full_time_series: data.time_series || data.full_time_series,
           Fs: data.Fs,
           duration: data.duration,
-          spectrogram_data: data.spectrogram_data,
+          spectrogram_data: data.spectrogram || data.spectrogram_data,
         };
 
     const normalized = normalizeApiPayload(payload);
+
+    // Debug log to confirm data flow
+    console.log("API Normalized Data:", {
+      spectrogramRows: normalized.spectrogram_data.length,
+      spectrogramCols: normalized.spectrogram_data[0]?.length,
+      frequencyPoints: normalized.frequency_arr.length
+    });
+
     if (normalized.frequency_arr.length === 0) {
       console.warn("Upload response missing frequency data; downstream views may hide until data is generated.");
     }
@@ -137,18 +146,18 @@ export const uploadAudio = async (file) => {
 export const downloadOutputAudio = async (signalId) => {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/api/audio/download_output?signal_id=${signalId}`,
-      {
-        method: "GET",
-      }
+        `${API_BASE_URL}/api/audio/download_output?signal_id=${signalId}`,
+        {
+          method: "GET",
+        }
     );
 
     if (!response.ok) {
       const errorData = await response
-        .json()
-        .catch(() => ({ error: "Unknown error" }));
+          .json()
+          .catch(() => ({ error: "Unknown error" }));
       throw new Error(
-        errorData.error || `HTTP error! status: ${response.status}`
+          errorData.error || `HTTP error! status: ${response.status}`
       );
     }
 

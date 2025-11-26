@@ -1,7 +1,24 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Card from "./Card";
 import Button from "./Button";
 import Subdivision from "./Subdivision";
+
+// Band configuration interface
+const getDefaultBands = () => [
+  { id: "sub", label: "Sub (20-60 Hz)", value: 0, min: -20, max: 20 },
+  { id: "bass", label: "Bass (60-250 Hz)", value: 0, min: -20, max: 20 },
+  { id: "low-mid", label: "Low-Mid (250-500 Hz)", value: 0, min: -20, max: 20 },
+  { id: "mid", label: "Mid (500-2k Hz)", value: 0, min: -20, max: 20 },
+  { id: "high-mid", label: "High-Mid (2k-4k Hz)", value: 0, min: -20, max: 20 },
+  { id: "presence", label: "Presence (4k-6k Hz)", value: 0, min: -20, max: 20 },
+  {
+    id: "brilliance",
+    label: "Brilliance (6k+ Hz)",
+    value: 0,
+    min: -20,
+    max: 20,
+  },
+];
 
 const GenericEqualizer = ({ isVisible = true, onClose }) => {
   const [hovered1, setHovered1] = useState(false);
@@ -9,16 +26,105 @@ const GenericEqualizer = ({ isVisible = true, onClose }) => {
   const [hovered3, setHovered3] = useState(false);
   const [hovered4, setHovered4] = useState(false);
   const [hovered5, setHovered5] = useState(false);
+  const [height, setHeight] = useState(500);
+  const [isDraggingHeight, setIsDraggingHeight] = useState(false);
+  const [bands, setBands] = useState(getDefaultBands());
+  const containerRef = useRef(null);
+
+  // Mouse move handler for resizing
+  const handleMouseMove = (e) => {
+    if (isDraggingHeight && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const newHeight = rect.bottom - e.clientY;
+      setHeight(Math.max(200, Math.min(600, newHeight)));
+    }
+  };
+
+  // Mouse up handler
+  const handleMouseUp = () => {
+    setIsDraggingHeight(false);
+  };
+
+  // Mouse down handler for resize handle
+  const handleMouseDownResize = (e) => {
+    e.preventDefault();
+    setIsDraggingHeight(true);
+  };
+
+  // Add Band functionality
+  const addBand = () => {
+    const newBand = {
+      id: `custom-${Date.now()}`,
+      label: "Custom Band",
+      value: 0,
+      min: -20,
+      max: 20,
+    };
+    setBands([...bands, newBand]);
+  };
+
+  // Remove Band functionality
+  const removeBand = (id) => {
+    if (bands.length > 3) {
+      // Keep minimum 3 bands
+      setBands(bands.filter((band) => band.id !== id));
+    }
+  };
+
+  // Handle slider value change
+  const handleSliderChange = (id, value) => {
+    setBands((prevBands) =>
+      prevBands.map((band) =>
+        band.id === id ? { ...band, value: value[0] } : band
+      )
+    );
+  };
+
+  // Reset all bands to default values
+  const resetAllBands = () => {
+    setBands(getDefaultBands());
+  };
+
+  // Add global event listeners
+  useEffect(() => {
+    if (isDraggingHeight) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+
+      return () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
+    }
+  }, [isDraggingHeight]);
 
   if (!isVisible) {
     return null;
   }
 
   return (
-    <div style={styles.stickyWrapper}>
+    <div
+      ref={containerRef}
+      style={{
+        ...styles.stickyWrapper,
+        height: `${height}px`,
+      }}
+    >
+      {/* Resize Handle */}
+      <div
+        style={styles.resizeHandle}
+        onMouseDown={handleMouseDownResize}
+        className={isDraggingHeight ? "resizing" : ""}
+      >
+        <div style={styles.resizeIndicator}>···</div>
+      </div>
+
       <Card
-        className="generic-equalizer col-11 mx-auto px-4 pb-4"
-        style={styles.card}
+        className="generic-equalizer col-10 mx-auto px-4 h-full pb-4"
+        style={{
+          ...styles.card,
+          height: "inherit",
+        }}
       >
         <div className="equalizer-header d-flex justify-content-between pt-3">
           <div className="equalizer-title d-flex pt-2">
@@ -98,7 +204,7 @@ const GenericEqualizer = ({ isVisible = true, onClose }) => {
               style={{ display: "none" }}
             />
 
-            {/* Add Band Button */}
+            {/* Add Band Button - Now functional */}
             <Button
               onMouseEnter={() => setHovered2(true)}
               onMouseLeave={() => setHovered2(false)}
@@ -126,6 +232,7 @@ const GenericEqualizer = ({ isVisible = true, onClose }) => {
                       border: "1px solid transparent",
                     }
               }
+              onClick={addBand}
             >
               <svg
                 viewBox="0 0 24 24"
@@ -142,7 +249,7 @@ const GenericEqualizer = ({ isVisible = true, onClose }) => {
               Add Band
             </Button>
 
-            {/* Reset All Button */}
+            {/* Reset All Button - Now functional */}
             <Button
               onMouseEnter={() => setHovered3(true)}
               onMouseLeave={() => setHovered3(false)}
@@ -170,6 +277,7 @@ const GenericEqualizer = ({ isVisible = true, onClose }) => {
                       border: "1px solid transparent",
                     }
               }
+              onClick={resetAllBands}
             >
               <svg
                 viewBox="0 0 24 24"
@@ -263,7 +371,7 @@ const GenericEqualizer = ({ isVisible = true, onClose }) => {
           </div>
         </div>
         <div
-          className="equalizer-canvas"
+          className="equalizer-canvas px-3"
           style={{
             width: "100%",
             height: `calc(100% - 80px)`,
@@ -271,7 +379,12 @@ const GenericEqualizer = ({ isVisible = true, onClose }) => {
             overflow: "auto",
           }}
         >
-          <Subdivision />
+          {/* Updated Subdivision with bands */}
+          <Subdivision
+            bands={bands}
+            onBandChange={handleSliderChange}
+            onRemoveBand={removeBand}
+          />
         </div>
       </Card>
     </div>
@@ -288,20 +401,56 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
+    transition: "height 0.1s ease",
   },
   card: {
     boxShadow: "0 -4px 20px rgba(0, 0, 0, 0.3)",
     marginBottom: "0",
     position: "relative",
-    overflow: "auto", // Required for resize
+    overflow: "auto",
     borderBottomLeftRadius: "0",
     borderBottomRightRadius: "0",
     width: "91.666%",
-    resize: "vertical", // This enables browser-native resize
-    minHeight: "200px",
-    maxHeight: "80vh",
-    height: "400px", // Initial height
+    height: "100%",
+  },
+  resizeHandle: {
+    position: "absolute",
+    top: "0",
+    left: "0",
+    right: "0",
+    height: "12px",
+    cursor: "ns-resize",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+    transition: "background-color 0.2s",
+    zIndex: 10,
+  },
+  resizeIndicator: {
+    color: "#666",
+    fontSize: "16px",
+    fontWeight: "bold",
+    userSelect: "none",
   },
 };
+
+// Add CSS for better resize experience
+const resizeStyles = `
+  .resizing {
+    background-color: rgba(123, 244, 71, 0.2) !important;
+  }
+  
+  .resizing .resize-indicator {
+    color: #7bf447;
+  }
+`;
+
+// Inject styles
+if (typeof document !== "undefined") {
+  const styleSheet = document.createElement("style");
+  styleSheet.innerText = resizeStyles;
+  document.head.appendChild(styleSheet);
+}
 
 export default GenericEqualizer;

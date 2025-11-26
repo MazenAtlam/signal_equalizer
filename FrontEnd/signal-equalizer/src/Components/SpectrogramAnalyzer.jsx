@@ -1,22 +1,7 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Card from "./Card";
 import Button from "./Button";
 import { drawSpectrogram } from "../utils/visualization";
-
-const transposeMatrix = (matrix = []) => {
-  if (!matrix.length) return [];
-  const transposed = [];
-  const rows = matrix.length;
-  const cols = matrix[0]?.length || 0;
-
-  for (let j = 0; j < cols; j++) {
-    transposed[j] = [];
-    for (let i = 0; i < rows; i++) {
-      transposed[j][i] = matrix[i][j];
-    }
-  }
-  return transposed;
-}
 
 const SpectrogramAnalyzer = ({
                                inputSpectrogram = [],
@@ -32,17 +17,12 @@ const SpectrogramAnalyzer = ({
   const inputCanvasRef = useRef(null);
   const outputCanvasRef = useRef(null);
 
-  // Transpose the spectrogram data (Frequency_Bins x Time_Frames)
-  const transposedInputSpectrogram = useMemo(() =>
-          transposeMatrix(inputSpectrogram)
-      , [inputSpectrogram]);
+  // Backend provides data as (Frequency_Bins x Time_Frames).
+  // drawSpectrogram expects (Frequency_Bins x Time_Frames).
+  // Therefore, NO transpose is needed.
 
-  const transposedOutputSpectrogram = useMemo(() =>
-          transposeMatrix(outputSpectrogram)
-      , [outputSpectrogram]);
-
-  const hasInputSpectrogram = transposedInputSpectrogram.length > 0;
-  const hasOutputSpectrogram = transposedOutputSpectrogram.length > 0;
+  const hasInputSpectrogram = Array.isArray(inputSpectrogram) && inputSpectrogram.length > 0;
+  const hasOutputSpectrogram = Array.isArray(outputSpectrogram) && outputSpectrogram.length > 0;
 
   useEffect(() => {
     if (
@@ -72,9 +52,10 @@ const SpectrogramAnalyzer = ({
         canvas.height = 300;
       }
 
-      drawSpectrogram(canvas, transposedInputSpectrogram, inputSampleRate, inputDuration);
+      // Pass inputSpectrogram directly without transpose
+      drawSpectrogram(canvas, inputSpectrogram, inputSampleRate, inputDuration);
     }
-  }, [transposedInputSpectrogram, hasInputSpectrogram, inputSampleRate, inputDuration]);
+  }, [inputSpectrogram, hasInputSpectrogram, inputSampleRate, inputDuration]);
 
   useEffect(() => {
     if (!hasOutputSpectrogram || !outputCanvasRef.current) {
@@ -94,9 +75,10 @@ const SpectrogramAnalyzer = ({
         canvas.height = 300;
       }
 
-      drawSpectrogram(canvas, transposedOutputSpectrogram, outputSampleRate, outputDuration);
+      // Pass outputSpectrogram directly without transpose
+      drawSpectrogram(canvas, outputSpectrogram, outputSampleRate, outputDuration);
     }
-  }, [transposedOutputSpectrogram, hasOutputSpectrogram, outputSampleRate, outputDuration]);
+  }, [outputSpectrogram, hasOutputSpectrogram, outputSampleRate, outputDuration]);
 
   if (!isVisible) {
     return null;

@@ -202,6 +202,9 @@ const UploadCard = ({ onDataLoad, onError }) => {
         magnitude_arr = mockFreqData.magnitudes;
       }
 
+      // DEBUG LOG requested
+      console.log("Backend Spectrogram Data (Before Decision):", sanitizedResponse.spectrogram_data);
+
       // Generate spectrogram data if not provided
       const spectrogramData =
         sanitizedResponse.spectrogram_data.length > 0
