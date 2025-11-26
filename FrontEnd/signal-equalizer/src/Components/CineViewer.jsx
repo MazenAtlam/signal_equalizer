@@ -1,10 +1,4 @@
-import React, {
-  useEffect,
-  useRef,
-  useState,
-  useMemo,
-  useCallback,
-} from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import Card from "./Card";
 import Button from "./Button";
 import PanelControls from "./PanelControls";
@@ -16,13 +10,13 @@ const sanitizeNumericArray = (arr = []) =>
     : [];
 
 const CineViewer = ({
-  inputTimeSeries = [],
-  outputTimeSeries = [],
-  sampleRate = 44100,
-  isVisible = true,
-  onClose,
-  onPlaybackUpdate,
-}) => {
+                      inputTimeSeries = [],
+                      outputTimeSeries = [],
+                      sampleRate = 44100,
+                      isVisible = true,
+                      onClose,
+                      onPlaybackUpdate,
+                    }) => {
   const inputCanvasRef = useRef(null);
   const outputCanvasRef = useRef(null);
   const inputContainerRef = useRef(null);
@@ -75,13 +69,74 @@ const CineViewer = ({
     return Math.max(inputDuration, outputDuration);
   }, [sanitizedInputSeries, sanitizedOutputSeries, safeSampleRate]);
 
+  // Calculate fixed amplitude range for both signals (symmetric around average)
+  const amplitudeRange = useMemo(() => {
+    const allInputValues = sanitizedInputSeries.length > 0 ? sanitizedInputSeries : [0];
+    const allOutputValues = sanitizedOutputSeries.length > 0 ? sanitizedOutputSeries : [0];
+
+    // Combine both signals to get overall range
+    const allValues = [...allInputValues, ...allOutputValues];
+
+    // Use a more efficient approach for large arrays
+    let minVal = Infinity;
+    let maxVal = -Infinity;
+
+    for (let i = 0; i < allValues.length; i++) {
+      const val = allValues[i];
+      if (val < minVal) minVal = val;
+      if (val > maxVal) maxVal = val;
+    }
+
+    // Handle case where all values are the same
+    if (minVal === Infinity) {
+      minVal = -1;
+      maxVal = 1;
+    } else if (minVal === maxVal) {
+      minVal -= 1;
+      maxVal += 1;
+    }
+
+    const average = (minVal + maxVal) / 2;
+
+    // Create symmetric range around average
+    const range = Math.max(Math.abs(maxVal - average), Math.abs(average - minVal));
+    const symmetricMin = average - range;
+    const symmetricMax = average + range;
+
+    return {
+      min: symmetricMin,
+      max: symmetricMax,
+      average: average,
+      range: range * 2
+    };
+  }, [sanitizedInputSeries, sanitizedOutputSeries]);
+
+  // Zoom limits
+  const minZoom = 0.1;
+  const maxZoom = 10.0;
+
   // Calculate visible time range based on zoom level and duration
   const visibleDuration = useMemo(() => {
-    const baseVisibleDuration = Math.min(10, duration);
+    const baseVisibleDuration = Math.min(10, duration); // Show max 10 seconds by default
     return Math.min(duration, baseVisibleDuration / zoomLevel);
   }, [duration, zoomLevel]);
 
-  // Update data ref when dependencies change
+  // Calculate start time for the visible window - always start from 0 when not playing
+  const visibleStartTime = useMemo(() => {
+    if (!isPlaying) {
+      return 0; // Always start from time 0 when not playing
+    }
+
+    // When playing, show current time at 20% from left for better visibility
+    const targetStart = currentTime - visibleDuration * 0.2;
+    return Math.max(0, Math.min(targetStart, duration - visibleDuration));
+  }, [currentTime, duration, visibleDuration, isPlaying]);
+
+  // Check zoom button disabled states
+  const isZoomOutDisabled = zoomLevel <= minZoom;
+  const isZoomInDisabled = zoomLevel >= maxZoom;
+
+  // Animation loop for cine viewer
   useEffect(() => {
     dataRef.current = {
       currentTime,
@@ -93,27 +148,10 @@ const CineViewer = ({
       visibleDuration,
       duration,
     };
-  }, [
-    currentTime,
-    isPlaying,
-    playbackRate,
-    sanitizedInputSeries,
-    sanitizedOutputSeries,
-    safeSampleRate,
-    visibleDuration,
-    duration,
-  ]);
+  }, [isPlaying, playbackRate, duration, onPlaybackUpdate]);
 
-  // Zoom limits
-  const minZoom = 0.1;
-  const maxZoom = 10.0;
-
-  // Check zoom button disabled states
-  const isZoomOutDisabled = zoomLevel <= minZoom;
-  const isZoomInDisabled = zoomLevel >= maxZoom;
-
-  // Setup canvas dimensions
-  const setupCanvas = useCallback((canvas, container) => {
+  // Setup canvas function - moved outside of useCallback to avoid dependency issues
+  const setupCanvas = (canvas, container, timeSeries, sampleRate, signalType) => {
     if (!canvas || !container) return;
 
     const computedStyle = getComputedStyle(container);
@@ -131,87 +169,41 @@ const CineViewer = ({
     canvas.height = contentHeight || 200;
   }, []);
 
-  useEffect(() => {
-    if (inputCanvasRef.current && inputContainerRef.current) {
-      setupCanvas(inputCanvasRef.current, inputContainerRef.current);
-    }
-  }, [setupCanvas]);
-
-  useEffect(() => {
-    if (outputCanvasRef.current && outputContainerRef.current) {
-      setupCanvas(outputCanvasRef.current, outputContainerRef.current);
-    }
-  }, [setupCanvas]);
-
-  // ★ FIXED: Draw function without dependencies that cause re-renders
-  const drawFrame = useCallback(() => {
-    const canvas1 = inputCanvasRef.current;
-    const canvas2 = outputCanvasRef.current;
-    if (!canvas1 || !canvas2) return;
-
-    const {
-      currentTime,
-      sanitizedInputSeries,
-      sanitizedOutputSeries,
-      safeSampleRate,
-      visibleDuration,
-      duration,
-    } = dataRef.current;
-
-    // Draw input signal
-    if (sanitizedInputSeries.length > 0) {
-      const ctx = canvas1.getContext("2d");
-      if (!ctx) return;
-
-      const width = canvas1.width;
-      const height = canvas1.height;
-
-      // Clear canvas
-      ctx.fillStyle = "#2b2b2bff";
-      ctx.fillRect(0, 0, width, height);
-
-      // Calculate visible time window for scrolling effect
-      const visibleStartTime = Math.max(0, currentTime - visibleDuration * 0.2);
-      const visibleEndTime = Math.min(
-        duration,
-        visibleStartTime + visibleDuration
-      );
-
-      // Calculate which portion of the signal to display
-      const startSample = Math.floor(visibleStartTime * safeSampleRate);
-      const endSample = Math.floor(visibleEndTime * safeSampleRate);
-      const visibleSamples = sanitizedInputSeries.slice(
-        Math.max(0, startSample),
-        Math.min(sanitizedInputSeries.length, endSample)
+    // Draw waveform if we have data
+    if (timeSeries.length > 0) {
+      // Calculate which portion of the signal to display based on zoom and current time
+      const startSample = Math.floor(visibleStartTime * sampleRate);
+      const endSample = Math.floor((visibleStartTime + visibleDuration) * sampleRate);
+      const visibleSamples = timeSeries.slice(
+          Math.max(0, startSample),
+          Math.min(timeSeries.length, endSample)
       );
 
       if (visibleSamples.length > 0) {
         // Draw the waveform using existing function
         drawWaveform(canvas1, visibleSamples, safeSampleRate, {
           startTime: visibleStartTime,
-          endTime: visibleEndTime,
-          backgroundColor: "#2b2b2bff",
+          visibleDuration: visibleDuration,
+          fixedAmplitudeRange: amplitudeRange, // Use fixed amplitude range
+          signalType: signalType
         });
       }
     }
+  };
 
-    // Draw output signal
-    if (sanitizedOutputSeries.length > 0) {
-      const ctx = canvas2.getContext("2d");
-      if (!ctx) return;
-
-      const width = canvas2.width;
-      const height = canvas2.height;
-
-      // Clear canvas
-      ctx.fillStyle = "#242425ff";
-      ctx.fillRect(0, 0, width, height);
-
-      // Calculate visible time window for scrolling effect
-      const visibleStartTime = Math.max(0, currentTime - visibleDuration * 0.2);
-      const visibleEndTime = Math.min(
-        duration,
-        visibleStartTime + visibleDuration
+  // Setup input canvas
+  useEffect(() => {
+    if (
+        sanitizedInputSeries.length > 0 &&
+        inputCanvasRef.current &&
+        inputContainerRef.current
+    ) {
+      setupCanvas(
+          inputCanvasRef.current,
+          inputContainerRef.current,
+          sanitizedInputSeries,
+          safeSampleRate,
+          "input"
       );
 
       // Calculate which portion of the signal to display
@@ -231,70 +223,24 @@ const CineViewer = ({
         });
       }
     }
-  }, []); // ★ Empty dependencies - uses dataRef instead
+  }, [sanitizedInputSeries, safeSampleRate, visibleStartTime, visibleDuration, currentTime, amplitudeRange, isPlaying]);
 
-  // ★ FIXED: Animation loop with proper dependency management
+  // Setup output canvas
   useEffect(() => {
-    let mounted = true;
-
-    const animate = (currentTimeStamp) => {
-      if (!mounted || !dataRef.current.isPlaying) return;
-
-      // Calculate delta time for smooth playback
-      if (lastTimeRef.current === 0) {
-        lastTimeRef.current = currentTimeStamp;
-      }
-
-      const deltaTime = (currentTimeStamp - lastTimeRef.current) / 1000;
-      lastTimeRef.current = currentTimeStamp;
-
-      // Update current time using the ref data
-      const newTime =
-        dataRef.current.currentTime + deltaTime * dataRef.current.playbackRate;
-
-      // Stop when reaching the end
-      if (newTime >= dataRef.current.duration) {
-        setIsPlaying(false);
-        setStatus("Paused");
-        setCurrentTime(dataRef.current.duration);
-        if (onPlaybackUpdate) {
-          onPlaybackUpdate(dataRef.current.duration, false);
-        }
-        return;
-      }
-
-      // Update state and notify parent
-      setCurrentTime(newTime);
-      if (onPlaybackUpdate) {
-        onPlaybackUpdate(newTime, true);
-      }
-
-      // Redraw the waveforms
-      drawFrame();
-
-      // Continue the animation loop
-      if (mounted && dataRef.current.isPlaying) {
-        animationRef.current = requestAnimationFrame(animate);
-      }
-    };
-
-    // Initial draw
-    drawFrame();
-
-    // Start animation if playing
-    if (isPlaying) {
-      lastTimeRef.current = 0;
-      animationRef.current = requestAnimationFrame(animate);
+    if (
+        sanitizedOutputSeries.length > 0 &&
+        outputCanvasRef.current &&
+        outputContainerRef.current
+    ) {
+      setupCanvas(
+          outputCanvasRef.current,
+          outputContainerRef.current,
+          sanitizedOutputSeries,
+          safeSampleRate,
+          "output"
+      );
     }
-
-    // Cleanup
-    return () => {
-      mounted = false;
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [isPlaying, onPlaybackUpdate, drawFrame]); // ★ Only depends on isPlaying and callbacks
+  }, [sanitizedOutputSeries, safeSampleRate, visibleStartTime, visibleDuration, currentTime, amplitudeRange, isPlaying]);
 
   // Control handlers
   const handlePlay = () => {
@@ -502,29 +448,27 @@ const CineViewer = ({
                 {formatTime(currentTime)}
               </span>
             </div>
-          </div>
-          <div
-            ref={outputContainerRef}
-            className="cine-content"
-            style={{
-              width: "100%",
-              height: "300px",
-              position: "relative",
-              padding: "12px",
-            }}
-          >
-            <canvas
-              ref={outputCanvasRef}
-              className="cine-canvas"
-              style={{
-                width: "100%",
-                height: "100%",
-                display: "block",
-                borderRadius: "4px",
-                backgroundColor: "#242425ff",
-              }}
-            ></canvas>
-          </div>
+          </Card>
+        </div>
+        <Card className="cine-controls-panel mx-4 mb-4">
+          <PanelControls
+              type="cine"
+              isPlaying={isPlaying}
+              currentTime={currentTime}
+              duration={duration}
+              playbackRate={playbackRate}
+              zoomLevel={zoomLevel}
+              onPlay={handlePlay}
+              onStop={handleStop}
+              onReset={handleReset}
+              onSpeedChange={handleSpeedChange}
+              onTimeChange={handleTimeChange}
+              onZoomChange={handleZoomChange}
+              onZoomIn={handleZoomIn}
+              onZoomOut={handleZoomOut}
+              isZoomInDisabled={isZoomInDisabled}
+              isZoomOutDisabled={isZoomOutDisabled}
+          />
         </Card>
       </div>
       <Card className="cine-controls-panel mx-4 mb-4">

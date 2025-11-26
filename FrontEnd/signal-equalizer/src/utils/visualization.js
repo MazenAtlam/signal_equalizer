@@ -551,31 +551,49 @@ export const drawSpectrogram = (canvas, spectrogramData, sampleRate = 44100, dur
 };
 
 /**
- * Get heat map color from normalized value (0-1)
+ * Get heat map color from normalized value (0-1) using an Inferno-like palette
+ * (Black -> Deep Purple -> Magenta -> Orange -> Yellow)
  * @param {number} value - Normalized value (0-1)
  * @returns {{r: number, g: number, b: number}}
  */
 const getHeatMapColor = (value) => {
   value = Math.max(0, Math.min(1, value));
 
-  // Blue to cyan to yellow to red
-  if (value < 0.25) {
-    const t = value / 0.25;
-    return { r: 0, g: Math.floor(t * 255), b: 255 };
-  } else if (value < 0.5) {
-    const t = (value - 0.25) / 0.25;
-    return { r: 0, g: 255, b: Math.floor(255 * (1 - t)) };
-  } else if (value < 0.75) {
-    const t = (value - 0.5) / 0.25;
-    return { r: Math.floor(t * 255), g: 255, b: 0 };
-  } else {
-    const t = (value - 0.75) / 0.25;
-    return { r: 255, g: Math.floor(255 * (1 - t)), b: 0 };
+  // Define stops for the Inferno gradient
+  const stops = [
+    { pos: 0.0, r: 204, g: 71, b: 120 },   // Red-Purple
+    { pos: 0.20, r: 101, g: 21, b: 110 },  // Purple
+    { pos: 0.44, r: 0, g: 0, b: 0 },        // Black
+    { pos: 0.52, r: 40, g: 11, b: 84 },    // Deep Purple
+    { pos: 0.65, r: 164, g: 35, b: 96 },   // Magenta
+    { pos: 0.83, r: 221, g: 81, b: 58 },   // Red-Orange
+    { pos: 0.92, r: 247, g: 147, b: 32 },   // Orange-Yellow
+    { pos: 1.0, r: 252, g: 255, b: 164 }    // Light Yellow
+  ];
+
+  // Find which segment 'value' falls into
+  for (let i = 0; i < stops.length - 1; i++) {
+    const start = stops[i];
+    const end = stops[i + 1];
+
+    if (value >= start.pos && value <= end.pos) {
+      // Interpolate
+      const t = (value - start.pos) / (end.pos - start.pos);
+      return {
+        r: Math.floor(start.r + t * (end.r - start.r)),
+        g: Math.floor(start.g + t * (end.g - start.g)),
+        b: Math.floor(start.b + t * (end.b - start.b))
+      };
+    }
   }
+
+  // Fallback for 1.0 (or slight floating point errors)
+  const last = stops[stops.length - 1];
+  return { r: last.r, g: last.g, b: last.b };
 };
 
 /**
- * Draw waveform with numbered axes and time window support
+ * Draw waveform with fixed amplitude axis symmetric around average
  * @param {HTMLCanvasElement} canvas - Canvas element
  * @param {Array<number>} timeSeries - Time series data
  * @param {number} sampleRate - Sample rate in Hz
@@ -614,6 +632,27 @@ export const drawWaveform = (canvas, timeSeries, sampleRate = 44100, options = {
 
   if (visibleSamples.length === 0) return;
 
+  // Use fixed amplitude range if provided, otherwise calculate from visible samples
+  let minVal, maxVal, range, average;
+  if (options.fixedAmplitudeRange) {
+    minVal = options.fixedAmplitudeRange.min;
+    maxVal = options.fixedAmplitudeRange.max;
+    average = options.fixedAmplitudeRange.average;
+    range = maxVal - minVal;
+  } else {
+    // Calculate from visible samples (fallback)
+    minVal = Math.min(...visibleSamples);
+    maxVal = Math.max(...visibleSamples);
+    average = (minVal + maxVal) / 2;
+    range = maxVal - minVal || 1;
+
+    // Make symmetric around average
+    const symmetricRange = Math.max(Math.abs(maxVal - average), Math.abs(average - minVal)) * 2;
+    minVal = average - symmetricRange / 2;
+    maxVal = average + symmetricRange / 2;
+    range = symmetricRange;
+  }
+
   // Downsample if necessary for performance
   const maxSamples = plotWidth;
   const step = Math.max(1, Math.floor(visibleSamples.length / maxSamples));
@@ -622,20 +661,16 @@ export const drawWaveform = (canvas, timeSeries, sampleRate = 44100, options = {
     samples.push(visibleSamples[i]);
   }
 
-  // Find min/max for scaling
-  const minVal = Math.min(...samples);
-  const maxVal = Math.max(...samples);
-  const range = maxVal - minVal || 1;
-  const centerY = padding.top + plotHeight / 2;
-
-  // Draw waveform
+  // Draw waveform with fixed amplitude range
   ctx.strokeStyle = options.lineColor || '#1FD5F9';
   ctx.lineWidth = options.lineWidth || 1;
   ctx.beginPath();
 
   for (let i = 0; i < samples.length; i++) {
     const x = padding.left + (i / (samples.length - 1 || 1)) * plotWidth;
-    const y = centerY - ((samples[i] - (minVal + maxVal) / 2) / range) * (plotHeight / 2);
+    // Use fixed amplitude range for consistent y-axis scaling
+    const normalizedValue = (samples[i] - minVal) / range;
+    const y = height - padding.bottom - normalizedValue * plotHeight;
 
     if (i === 0) {
       ctx.moveTo(x, y);
@@ -646,7 +681,8 @@ export const drawWaveform = (canvas, timeSeries, sampleRate = 44100, options = {
 
   ctx.stroke();
 
-  // Draw center line
+  // Draw center line (zero/average line)
+  const centerY = height - padding.bottom - ((average - minVal) / range) * plotHeight;
   ctx.strokeStyle = options.centerLineColor || '#666';
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -670,7 +706,7 @@ export const drawWaveform = (canvas, timeSeries, sampleRate = 44100, options = {
   ctx.lineTo(padding.left, height - padding.bottom);
   ctx.stroke();
 
-  // Draw axis labels with actual values
+  // Draw axis labels with fixed values
   ctx.fillStyle = options.labelColor || '#fff';
   ctx.font = '12px Arial';
   ctx.textAlign = 'center';
@@ -683,13 +719,13 @@ export const drawWaveform = (canvas, timeSeries, sampleRate = 44100, options = {
     ctx.fillText(timeValue.toFixed(2) + 's', x, height - padding.bottom + 20);
   }
 
-  // Y-axis labels (amplitude)
+  // Y-axis labels (amplitude) - fixed values based on the amplitude range
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   const amplitudeSteps = 4;
   for (let i = 0; i <= amplitudeSteps; i++) {
     const amplitude = minVal + (i / amplitudeSteps) * range;
-    const y = padding.top + (1 - i / amplitudeSteps) * plotHeight;
+    const y = height - padding.bottom - (i / amplitudeSteps) * plotHeight;
     ctx.fillText(amplitude.toFixed(2), padding.left - 10, y);
   }
 
