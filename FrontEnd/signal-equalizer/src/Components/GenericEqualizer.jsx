@@ -28,8 +28,13 @@ const GenericEqualizer = ({ isVisible = true, onClose }) => {
   const [hovered5, setHovered5] = useState(false);
   const [height, setHeight] = useState(500);
   const [isDraggingHeight, setIsDraggingHeight] = useState(false);
-  const [bands, setBands] = useState(getDefaultBands());
+  const [bands, setBands] = useState([]); // Start with empty array
   const containerRef = useRef(null);
+
+  // Initialize bands only once on mount
+  useEffect(() => {
+    setBands(getDefaultBands());
+  }, []);
 
   // Mouse move handler for resizing
   const handleMouseMove = (e) => {
@@ -60,14 +65,14 @@ const GenericEqualizer = ({ isVisible = true, onClose }) => {
       min: -20,
       max: 20,
     };
-    setBands([...bands, newBand]);
+    setBands((prevBands) => [...prevBands, newBand]);
   };
 
   // Remove Band functionality
   const removeBand = (id) => {
     if (bands.length > 3) {
       // Keep minimum 3 bands
-      setBands(bands.filter((band) => band.id !== id));
+      setBands((prevBands) => prevBands.filter((band) => band.id !== id));
     }
   };
 
@@ -379,12 +384,16 @@ const GenericEqualizer = ({ isVisible = true, onClose }) => {
             overflow: "auto",
           }}
         >
-          {/* Updated Subdivision with bands */}
-          <Subdivision
-            bands={bands}
-            onBandChange={handleSliderChange}
-            onRemoveBand={removeBand}
-          />
+          {/* Updated Subdivision with bands - Only render when bands are available */}
+          {bands.length > 0 && (
+            <Subdivision
+              bands={bands}
+              onBandChange={handleSliderChange}
+              onRemoveBand={removeBand}
+              bandsPosition="below" // New prop to control bands position
+              orientation="vertical" // Ensure vertical sliders
+            />
+          )}
         </div>
       </Card>
     </div>
