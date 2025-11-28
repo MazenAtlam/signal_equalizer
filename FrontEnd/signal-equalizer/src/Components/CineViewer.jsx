@@ -1,4 +1,10 @@
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+  useCallback,
+} from "react";
 import Card from "./Card";
 import Button from "./Button";
 import PanelControls from "./PanelControls";
@@ -10,31 +16,19 @@ const sanitizeNumericArray = (arr = []) =>
     : [];
 
 const CineViewer = ({
-                      inputTimeSeries = [],
-                      outputTimeSeries = [],
-                      sampleRate = 44100,
-                      isVisible = true,
-                      onClose,
-                      onPlaybackUpdate,
-                    }) => {
+  inputTimeSeries = [],
+  outputTimeSeries = [],
+  sampleRate = 44100,
+  isVisible = true,
+  onClose,
+  onPlaybackUpdate,
+}) => {
   const inputCanvasRef = useRef(null);
   const outputCanvasRef = useRef(null);
   const inputContainerRef = useRef(null);
   const outputContainerRef = useRef(null);
   const animationRef = useRef(null);
   const lastTimeRef = useRef(0);
-
-  // Use refs for data that changes frequently to avoid re-renders
-  const dataRef = useRef({
-    currentTime: 0,
-    isPlaying: false,
-    playbackRate: 1.0,
-    sanitizedInputSeries: [],
-    sanitizedOutputSeries: [],
-    safeSampleRate: 44100,
-    visibleDuration: 1,
-    duration: 1,
-  });
 
   const [status, setStatus] = useState("Paused");
   const [hovered, setHovered] = useState(false);
@@ -69,15 +63,14 @@ const CineViewer = ({
     return Math.max(inputDuration, outputDuration);
   }, [sanitizedInputSeries, sanitizedOutputSeries, safeSampleRate]);
 
-  // Calculate fixed amplitude range for both signals (symmetric around average)
+  // Calculate fixed amplitude range for both signals
   const amplitudeRange = useMemo(() => {
-    const allInputValues = sanitizedInputSeries.length > 0 ? sanitizedInputSeries : [0];
-    const allOutputValues = sanitizedOutputSeries.length > 0 ? sanitizedOutputSeries : [0];
-
-    // Combine both signals to get overall range
+    const allInputValues =
+      sanitizedInputSeries.length > 0 ? sanitizedInputSeries : [0];
+    const allOutputValues =
+      sanitizedOutputSeries.length > 0 ? sanitizedOutputSeries : [0];
     const allValues = [...allInputValues, ...allOutputValues];
 
-    // Use a more efficient approach for large arrays
     let minVal = Infinity;
     let maxVal = -Infinity;
 
@@ -87,7 +80,6 @@ const CineViewer = ({
       if (val > maxVal) maxVal = val;
     }
 
-    // Handle case where all values are the same
     if (minVal === Infinity) {
       minVal = -1;
       maxVal = 1;
@@ -97,9 +89,10 @@ const CineViewer = ({
     }
 
     const average = (minVal + maxVal) / 2;
-
-    // Create symmetric range around average
-    const range = Math.max(Math.abs(maxVal - average), Math.abs(average - minVal));
+    const range = Math.max(
+      Math.abs(maxVal - average),
+      Math.abs(average - minVal)
+    );
     const symmetricMin = average - range;
     const symmetricMax = average + range;
 
@@ -107,7 +100,7 @@ const CineViewer = ({
       min: symmetricMin,
       max: symmetricMax,
       average: average,
-      range: range * 2
+      range: range * 2,
     };
   }, [sanitizedInputSeries, sanitizedOutputSeries]);
 
@@ -117,17 +110,15 @@ const CineViewer = ({
 
   // Calculate visible time range based on zoom level and duration
   const visibleDuration = useMemo(() => {
-    const baseVisibleDuration = Math.min(10, duration); // Show max 10 seconds by default
+    const baseVisibleDuration = Math.min(10, duration);
     return Math.min(duration, baseVisibleDuration / zoomLevel);
   }, [duration, zoomLevel]);
 
-  // Calculate start time for the visible window - always start from 0 when not playing
+  // Calculate start time for the visible window
   const visibleStartTime = useMemo(() => {
     if (!isPlaying) {
-      return 0; // Always start from time 0 when not playing
+      return 0;
     }
-
-    // When playing, show current time at 20% from left for better visibility
     const targetStart = currentTime - visibleDuration * 0.2;
     return Math.max(0, Math.min(targetStart, duration - visibleDuration));
   }, [currentTime, duration, visibleDuration, isPlaying]);
@@ -136,117 +127,192 @@ const CineViewer = ({
   const isZoomOutDisabled = zoomLevel <= minZoom;
   const isZoomInDisabled = zoomLevel >= maxZoom;
 
-  // Animation loop for cine viewer
+  // Setup and draw canvas function
+  const setupAndDrawCanvas = useCallback(
+    (canvas, container, timeSeries, sampleRate, signalType) => {
+      if (!canvas || !container) return;
+
+      // Setup canvas dimensions
+      const computedStyle = getComputedStyle(container);
+      const paddingX =
+        parseFloat(computedStyle.paddingLeft) +
+        parseFloat(computedStyle.paddingRight);
+      const paddingY =
+        parseFloat(computedStyle.paddingTop) +
+        parseFloat(computedStyle.paddingBottom);
+
+      const contentWidth = container.clientWidth - paddingX;
+      const contentHeight = container.clientHeight - paddingY;
+
+      canvas.width = contentWidth || 500;
+      canvas.height = contentHeight || 200;
+
+      // Draw waveform if we have data
+      if (timeSeries.length > 0) {
+        const startSample = Math.floor(visibleStartTime * sampleRate);
+        const endSample = Math.floor(
+          (visibleStartTime + visibleDuration) * sampleRate
+        );
+        const visibleSamples = timeSeries.slice(
+          Math.max(0, startSample),
+          Math.min(timeSeries.length, endSample)
+        );
+
+        if (visibleSamples.length > 0) {
+          drawWaveform(canvas, visibleSamples, sampleRate, {
+            startTime: visibleStartTime,
+            visibleDuration: visibleDuration,
+            fixedAmplitudeRange: amplitudeRange,
+            signalType: signalType,
+          });
+        } else {
+          // Clear canvas if no visible samples
+          const ctx = canvas.getContext("2d");
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      } else {
+        // Clear canvas if no data
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    },
+    [visibleStartTime, visibleDuration, amplitudeRange]
+  );
+
+  // Animation loop
   useEffect(() => {
-    dataRef.current = {
-      currentTime,
-      isPlaying,
-      playbackRate,
-      sanitizedInputSeries,
-      sanitizedOutputSeries,
-      safeSampleRate,
-      visibleDuration,
-      duration,
+    if (isPlaying) {
+      const animate = (timestamp) => {
+        if (lastTimeRef.current === 0) {
+          lastTimeRef.current = timestamp;
+        }
+
+        const delta = (timestamp - lastTimeRef.current) / 1000; // Convert to seconds
+        lastTimeRef.current = timestamp;
+
+        setCurrentTime((prevTime) => {
+          const newTime = prevTime + delta * playbackRate;
+          if (newTime >= duration) {
+            setIsPlaying(false);
+            setStatus("Paused");
+            if (onPlaybackUpdate) {
+              onPlaybackUpdate(duration, false);
+            }
+            return duration;
+          }
+          return newTime;
+        });
+
+        animationRef.current = requestAnimationFrame(animate);
+      };
+
+      animationRef.current = requestAnimationFrame(animate);
+    } else {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+      lastTimeRef.current = 0;
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
     };
   }, [isPlaying, playbackRate, duration, onPlaybackUpdate]);
 
-  // Setup canvas function - moved outside of useCallback to avoid dependency issues
-  const setupCanvas = (canvas, container, timeSeries, sampleRate, signalType) => {
-    if (!canvas || !container) return;
-
-    const computedStyle = getComputedStyle(container);
-    const paddingX =
-      parseFloat(computedStyle.paddingLeft) +
-      parseFloat(computedStyle.paddingRight);
-    const paddingY =
-      parseFloat(computedStyle.paddingTop) +
-      parseFloat(computedStyle.paddingBottom);
-
-    const contentWidth = container.clientWidth - paddingX;
-    const contentHeight = container.clientHeight - paddingY;
-
-    canvas.width = contentWidth || 500;
-    canvas.height = contentHeight || 200;
-  }, []);
-
-    // Draw waveform if we have data
-    if (timeSeries.length > 0) {
-      // Calculate which portion of the signal to display based on zoom and current time
-      const startSample = Math.floor(visibleStartTime * sampleRate);
-      const endSample = Math.floor((visibleStartTime + visibleDuration) * sampleRate);
-      const visibleSamples = timeSeries.slice(
-          Math.max(0, startSample),
-          Math.min(timeSeries.length, endSample)
-      );
-
-      if (visibleSamples.length > 0) {
-        // Draw the waveform using existing function
-        drawWaveform(canvas1, visibleSamples, safeSampleRate, {
-          startTime: visibleStartTime,
-          visibleDuration: visibleDuration,
-          fixedAmplitudeRange: amplitudeRange, // Use fixed amplitude range
-          signalType: signalType
-        });
-      }
-    }
-  };
-
   // Setup input canvas
   useEffect(() => {
-    if (
-        sanitizedInputSeries.length > 0 &&
-        inputCanvasRef.current &&
-        inputContainerRef.current
-    ) {
-      setupCanvas(
+    if (inputCanvasRef.current && inputContainerRef.current) {
+      setupAndDrawCanvas(
+        inputCanvasRef.current,
+        inputContainerRef.current,
+        sanitizedInputSeries,
+        safeSampleRate,
+        "input"
+      );
+    }
+  }, [sanitizedInputSeries, safeSampleRate, setupAndDrawCanvas]);
+
+  // Setup output canvas
+  useEffect(() => {
+    if (outputCanvasRef.current && outputContainerRef.current) {
+      setupAndDrawCanvas(
+        outputCanvasRef.current,
+        outputContainerRef.current,
+        sanitizedOutputSeries,
+        safeSampleRate,
+        "output"
+      );
+    }
+  }, [sanitizedOutputSeries, safeSampleRate, setupAndDrawCanvas]);
+
+  // Redraw canvases when time or zoom changes
+  useEffect(() => {
+    if (inputCanvasRef.current && inputContainerRef.current) {
+      setupAndDrawCanvas(
+        inputCanvasRef.current,
+        inputContainerRef.current,
+        sanitizedInputSeries,
+        safeSampleRate,
+        "input"
+      );
+    }
+    if (outputCanvasRef.current && outputContainerRef.current) {
+      setupAndDrawCanvas(
+        outputCanvasRef.current,
+        outputContainerRef.current,
+        sanitizedOutputSeries,
+        safeSampleRate,
+        "output"
+      );
+    }
+  }, [
+    currentTime,
+    zoomLevel,
+    setupAndDrawCanvas,
+    sanitizedInputSeries,
+    sanitizedOutputSeries,
+    safeSampleRate,
+  ]);
+
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (inputCanvasRef.current && inputContainerRef.current) {
+        setupAndDrawCanvas(
           inputCanvasRef.current,
           inputContainerRef.current,
           sanitizedInputSeries,
           safeSampleRate,
           "input"
-      );
-
-      // Calculate which portion of the signal to display
-      const startSample = Math.floor(visibleStartTime * safeSampleRate);
-      const endSample = Math.floor(visibleEndTime * safeSampleRate);
-      const visibleSamples = sanitizedOutputSeries.slice(
-        Math.max(0, startSample),
-        Math.min(sanitizedOutputSeries.length, endSample)
-      );
-
-      if (visibleSamples.length > 0) {
-        // Draw the waveform using existing function
-        drawWaveform(canvas2, visibleSamples, safeSampleRate, {
-          startTime: visibleStartTime,
-          endTime: visibleEndTime,
-          backgroundColor: "#242425ff",
-        });
+        );
       }
-    }
-  }, [sanitizedInputSeries, safeSampleRate, visibleStartTime, visibleDuration, currentTime, amplitudeRange, isPlaying]);
-
-  // Setup output canvas
-  useEffect(() => {
-    if (
-        sanitizedOutputSeries.length > 0 &&
-        outputCanvasRef.current &&
-        outputContainerRef.current
-    ) {
-      setupCanvas(
+      if (outputCanvasRef.current && outputContainerRef.current) {
+        setupAndDrawCanvas(
           outputCanvasRef.current,
           outputContainerRef.current,
           sanitizedOutputSeries,
           safeSampleRate,
           "output"
-      );
-    }
-  }, [sanitizedOutputSeries, safeSampleRate, visibleStartTime, visibleDuration, currentTime, amplitudeRange, isPlaying]);
+        );
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [
+    setupAndDrawCanvas,
+    sanitizedInputSeries,
+    sanitizedOutputSeries,
+    safeSampleRate,
+  ]);
 
   // Control handlers
   const handlePlay = () => {
     if (duration === 0) return;
 
-    // Only reset to beginning if we're already at the end
     if (currentTime >= duration) {
       setCurrentTime(0);
     }
@@ -374,7 +440,9 @@ const CineViewer = ({
           </svg>
         </Button>
       </div>
+
       <div className="cine-grid px-4 d-flex gap-3 my-4">
+        {/* Input Signal Panel */}
         <Card className="cine-panel col-6">
           <div className="panel-header d-flex justify-content-between align-items-center ps-4 pt-4 pb-2 col-9">
             <h4 className="panel-title m-0 h-6" style={{ fontSize: "13px" }}>
@@ -422,6 +490,8 @@ const CineViewer = ({
             ></canvas>
           </div>
         </Card>
+
+        {/* Output Signal Panel */}
         <Card className="cine-panel col-6">
           <div className="panel-header d-flex justify-content-between align-items-center ps-4 pt-4 pb-2 col-9">
             <h4
@@ -448,29 +518,33 @@ const CineViewer = ({
                 {formatTime(currentTime)}
               </span>
             </div>
-          </Card>
-        </div>
-        <Card className="cine-controls-panel mx-4 mb-4">
-          <PanelControls
-              type="cine"
-              isPlaying={isPlaying}
-              currentTime={currentTime}
-              duration={duration}
-              playbackRate={playbackRate}
-              zoomLevel={zoomLevel}
-              onPlay={handlePlay}
-              onStop={handleStop}
-              onReset={handleReset}
-              onSpeedChange={handleSpeedChange}
-              onTimeChange={handleTimeChange}
-              onZoomChange={handleZoomChange}
-              onZoomIn={handleZoomIn}
-              onZoomOut={handleZoomOut}
-              isZoomInDisabled={isZoomInDisabled}
-              isZoomOutDisabled={isZoomOutDisabled}
-          />
+          </div>
+          <div
+            ref={outputContainerRef}
+            className="cine-content"
+            style={{
+              width: "100%",
+              height: "300px",
+              position: "relative",
+              padding: "12px",
+            }}
+          >
+            <canvas
+              ref={outputCanvasRef}
+              className="cine-canvas"
+              style={{
+                width: "100%",
+                height: "100%",
+                display: "block",
+                borderRadius: "4px",
+                backgroundColor: "#2b2b2bff",
+              }}
+            ></canvas>
+          </div>
         </Card>
       </div>
+
+      {/* Controls Panel */}
       <Card className="cine-controls-panel mx-4 mb-4">
         <PanelControls
           type="cine"

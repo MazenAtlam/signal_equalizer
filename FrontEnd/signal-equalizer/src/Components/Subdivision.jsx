@@ -1,6 +1,34 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import DraggableSlider from "./DraggableSlider";
 
-const Subdivision = ({ bands = [], onBandChange, onRemoveBand }) => {
+const Subdivision = ({
+  bands = [],
+  onBandChange,
+  onBandPositionChange,
+  onBandBandwidthChange,
+  onRemoveBand,
+  bandsPosition = "below",
+  orientation = "vertical",
+}) => {
+  // Use local state to manage band positions and bandwidth
+  const [localBands, setLocalBands] = useState([]);
+  const [activeBandId, setActiveBandId] = useState(null); // Track which band is being actively modified
+
+  // Initialize bands with positions and bandwidth when component mounts or bands prop changes
+  useEffect(() => {
+    if (bands.length > 0) {
+      const bandsWithProperties = bands.map((band, index) => ({
+        ...band,
+        position:
+          band.position !== undefined
+            ? band.position
+            : getBandInitialPosition(band.label, index, bands.length),
+        bandwidth: band.bandwidth !== undefined ? band.bandwidth : 1, // Default bandwidth
+      }));
+      setLocalBands(bandsWithProperties);
+    }
+  }, [bands]);
+
   // Logarithmic distribution for audio frequencies (20Hz to 20kHz)
   const frequencies = [
     { freq: 20, label: "20Hz" },
@@ -45,140 +73,170 @@ const Subdivision = ({ bands = [], onBandChange, onRemoveBand }) => {
     return ((freqLog - minLog) / (maxLog - minLog)) * 100;
   };
 
+  // Convert position to frequency (inverse of freqToPosition)
+  const positionToFreq = (position) => {
+    const minFreq = 20;
+    const maxFreq = 20000;
+    const minLog = Math.log10(minFreq);
+    const maxLog = Math.log10(maxFreq);
+    const freqLog = minLog + (position / 100) * (maxLog - minLog);
+    return Math.pow(10, freqLog);
+  };
+
   // Major frequencies for prominent labels
   const majorFrequencies = [
     20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000,
   ];
 
-  // Simple slider component for bands
-  const BandSlider = ({ band, onRemove }) => {
-    const position = 10 + Math.random() * 80; // Random position for demo
+  // Map band labels to approximate frequency positions
+  const getBandInitialPosition = (bandLabel, index, totalBands) => {
+    const positionMap = {
+      sub: 10, // ~30Hz
+      bass: 20, // ~100Hz
+      "low-mid": 35, // ~350Hz
+      mid: 50, // ~1kHz
+      "high-mid": 65, // ~3kHz
+      presence: 80, // ~5kHz
+      brilliance: 90, // ~8kHz
+    };
 
-    return (
-      <div
-        style={{
-          position: "absolute",
-          left: `${position}%`,
-          bottom: "50px",
-          transform: "translateX(-50%)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          zIndex: 10,
-        }}
-      >
-        {/* Band Label */}
-        <div
-          style={{
-            fontSize: "10px",
-            color: "#374151",
-            marginBottom: "5px",
-            textAlign: "center",
-            maxWidth: "80px",
-            wordBreak: "break-word",
-          }}
-        >
-          {band.label}
-        </div>
+    // Extract key from label for custom bands or exact matches
+    const key = bandLabel.toLowerCase().split(" ")[0];
+    const exactPosition = positionMap[key];
 
-        {/* Value Display */}
-        <div
-          style={{
-            fontSize: "9px",
-            color: "#1FD5F9",
-            fontWeight: "bold",
-            marginBottom: "5px",
-          }}
-        >
-          {band.value > 0 ? "+" : ""}
-          {band.value}dB
-        </div>
+    if (exactPosition) {
+      return exactPosition;
+    }
 
-        {/* Vertical Slider */}
-        <div
-          style={{
-            position: "relative",
-            height: "120px",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-          }}
-        >
-          <input
-            type="range"
-            min={band.min}
-            max={band.max}
-            value={band.value}
-            onChange={(e) =>
-              onBandChange(band.id, [parseFloat(e.target.value)])
-            }
-            style={{
-              transform: "rotate(-90deg)",
-              width: "120px",
-              height: "20px",
-              margin: "50px 0",
-              cursor: "pointer",
-            }}
-          />
-        </div>
-
-        {/* Remove Button for custom bands */}
-        {band.id.startsWith("custom-") && bands.length > 3 && (
-          <button
-            onClick={() => onRemove(band.id)}
-            style={{
-              marginTop: "10px",
-              fontSize: "8px",
-              color: "#ef4444",
-              background: "transparent",
-              border: "1px solid #ef4444",
-              borderRadius: "3px",
-              padding: "2px 6px",
-              cursor: "pointer",
-            }}
-          >
-            Remove
-          </button>
-        )}
-      </div>
-    );
+    // For custom bands, distribute evenly
+    return (index / Math.max(1, totalBands - 1)) * 80 + 10;
   };
+
+  // Handle band position change
+  const handleBandPositionChange = (
+    bandId,
+    newPosition,
+    isActiveModification = false
+  ) => {
+    if (isActiveModification) {
+      setActiveBandId(bandId);
+    }
+
+    setLocalBands((prevBands) =>
+      prevBands.map((band) =>
+        band.id === bandId ? { ...band, position: newPosition } : band
+      )
+    );
+
+    if (onBandPositionChange) {
+      onBandPositionChange(bandId, newPosition);
+    }
+  };
+
+  // Handle band gain change
+  const handleBandGainChange = (bandId, newValue) => {
+    setLocalBands((prevBands) =>
+      prevBands.map((band) =>
+        band.id === bandId ? { ...band, value: newValue } : band
+      )
+    );
+
+    if (onBandChange) {
+      onBandChange(bandId, [newValue]);
+    }
+  };
+
+  // Handle band bandwidth change (unlimited)
+  const handleBandBandwidthChange = (
+    bandId,
+    newBandwidth,
+    isActiveModification = false
+  ) => {
+    if (isActiveModification) {
+      setActiveBandId(bandId);
+    }
+
+    setLocalBands((prevBands) =>
+      prevBands.map((band) =>
+        band.id === bandId ? { ...band, bandwidth: newBandwidth } : band
+      )
+    );
+
+    if (onBandBandwidthChange) {
+      onBandBandwidthChange(bandId, newBandwidth);
+    }
+  };
+
+  // Handle band removal
+  const handleRemoveBand = (bandId) => {
+    setLocalBands((prevBands) =>
+      prevBands.filter((band) => band.id !== bandId)
+    );
+
+    if (onRemoveBand) {
+      onRemoveBand(bandId);
+    }
+  };
+
+  // Reset active band when mouse is released anywhere
+  useEffect(() => {
+    const handleMouseUp = () => {
+      setActiveBandId(null);
+    };
+
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
 
   return (
     <div
       className="subdivision-container"
-      style={{ position: "relative", width: "100%", height: "100%" }}
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        minHeight: "250px",
+        backgroundColor: "#1a1a1a",
+        borderRadius: "8px",
+        padding: "10px",
+      }}
     >
       <div
         className="placeholder-text"
         style={{
           textAlign: "center",
-          color: "#666",
-          fontSize: "14px",
-          marginBottom: "20px",
-          padding: "10px",
+          color: "#888",
+          fontSize: "12px",
+          marginBottom: "15px",
+          padding: "5px",
+          fontStyle: "italic",
         }}
       >
-        Equalizer Bands - Drag sliders to adjust levels
+        Drag bands to reposition, drag vertically for gain, drag dots for
+        unlimited width adjustment
       </div>
 
+      {/* Main container with frequency line and bands */}
       <div
         style={{
           position: "relative",
           width: "100%",
-          height: "60px",
-          padding: "0 20px",
+          height: bandsPosition === "below" ? "200px" : "150px",
+          padding: "0 10px",
         }}
       >
-        {/* Frequency line */}
+        {/* Frequency line - Always at the top */}
         <div
           style={{
             position: "absolute",
             top: "30px",
-            left: "20px",
-            right: "20px",
+            left: "10px",
+            right: "10px",
             height: "2px",
-            backgroundColor: "#e5e7eb",
+            backgroundColor: "#4B5563",
+            zIndex: 5,
           }}
         />
 
@@ -198,14 +256,15 @@ const Subdivision = ({ bands = [], onBandChange, onRemoveBand }) => {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
+                zIndex: 5,
               }}
             >
               {/* Marker line */}
               <div
                 style={{
                   width: isMajor ? "2px" : "1px",
-                  height: isMajor ? "10px" : "6px",
-                  backgroundColor: isMajor ? "#374151" : "#9ca3af",
+                  height: isMajor ? "12px" : "8px",
+                  backgroundColor: isMajor ? "#1FD5F9" : "#6B7280",
                 }}
               />
 
@@ -213,9 +272,9 @@ const Subdivision = ({ bands = [], onBandChange, onRemoveBand }) => {
               {isMajor && (
                 <div
                   style={{
-                    marginTop: "12px",
-                    fontSize: "10px",
-                    color: "#f3f5f8ff",
+                    marginTop: "14px",
+                    fontSize: "9px",
+                    color: "#e5e7eb",
                     fontWeight: "500",
                     whiteSpace: "nowrap",
                   }}
@@ -227,9 +286,20 @@ const Subdivision = ({ bands = [], onBandChange, onRemoveBand }) => {
           );
         })}
 
-        {/* Render band sliders */}
-        {bands.map((band) => (
-          <BandSlider key={band.id} band={band} onRemove={onRemoveBand} />
+        {/* Render draggable band sliders */}
+        {localBands.map((band) => (
+          <DraggableSlider
+            key={band.id}
+            band={band}
+            onGainChange={handleBandGainChange}
+            onPositionChange={handleBandPositionChange}
+            onBandwidthChange={handleBandBandwidthChange}
+            onRemove={handleRemoveBand}
+            bandsPosition={bandsPosition}
+            positionToFreq={positionToFreq}
+            freqToPosition={freqToPosition}
+            isActive={band.id === activeBandId}
+          />
         ))}
       </div>
     </div>
