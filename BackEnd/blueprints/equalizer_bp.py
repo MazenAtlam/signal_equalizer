@@ -109,7 +109,7 @@ def equalize_with_ai_comparison():
 
         if mode_name == 'musical':
             source_paths = run_demucs_separation(temp_input_path, Fs, output_dir)
-        elif mode_name in ['human', 'voices']:
+        elif mode_name == 'human':
             source_paths = run_speechbrain_separation(temp_input_path, Fs, output_dir)
         else:
             return jsonify({'error': 'Invalid preset.'}), 400
