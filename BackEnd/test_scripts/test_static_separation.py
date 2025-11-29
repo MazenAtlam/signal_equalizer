@@ -2,23 +2,77 @@ import numpy as np
 import soundfile as sf
 from pydub import AudioSegment
 import os
-import array
 
 # --- 1. CONFIGURATION ---
 
-# IMPORTANT: Ensure this path is correct relative to where you run the script.
-TEST_FILE_INPUT = r'..\input\music_test\1\mixture.wav' 
+# Path to your input file
+TEST_FILE_INPUT = '../input/input.wav' 
 
-# Define the revised frequency ranges for separation (passbands)
+# REVISED: Now accepts a LIST of frequency ranges for each instrument.
+# You can add as many bands as you want for a single instrument.
 MUSICAL_SEPARATION_RANGES = {
-    "vocals":    {"freq_start_hz": 300,   "freq_end_hz": 4000},   # Focusing on intelligibility band
-    "drums":     {"freq_start_hz": 5000,  "freq_end_hz": 15000},  # Focusing on cymbals and high transients
-    "bass":      {"freq_start_hz": 50,    "freq_end_hz": 250},    # Focusing on pure low-end power
-    "other":     {"freq_start_hz": 150,   "freq_end_hz": 2000},   # Focusing on instrument body/mids
+"vocals": [
+    { "freq_start_hz": 280, "freq_end_hz": 310 },
+    { "freq_start_hz": 340, "freq_end_hz": 370 },
+    { "freq_start_hz": 500, "freq_end_hz": 535 },
+    { "freq_start_hz": 565, "freq_end_hz": 595 },
+    { "freq_start_hz": 660, "freq_end_hz": 710 },
+    { "freq_start_hz": 755, "freq_end_hz": 790 },
+    { "freq_start_hz": 855, "freq_end_hz": 890 },
+    { "freq_start_hz": 970, "freq_end_hz": 1000 },
+    { "freq_start_hz": 1020, "freq_end_hz": 1060 },
+    { "freq_start_hz": 1190, "freq_end_hz": 1250 },
+    { "freq_start_hz": 1285, "freq_end_hz": 1325 },
+    { "freq_start_hz": 1345, "freq_end_hz": 1385 },
+    { "freq_start_hz": 1400, "freq_end_hz": 1440 },
+    { "freq_start_hz": 1535, "freq_end_hz": 1575 },
+    { "freq_start_hz": 1720, "freq_end_hz": 1755 },
+    { "freq_start_hz": 1785, "freq_end_hz": 1820 },
+    { "freq_start_hz": 1835, "freq_end_hz": 1885 },
+    { "freq_start_hz": 1900, "freq_end_hz": 1950 },
+    { "freq_start_hz": 1985, "freq_end_hz": 2025 },
+    { "freq_start_hz": 2040, "freq_end_hz": 2080 },
+    { "freq_start_hz": 2090, "freq_end_hz": 2130 },
+    { "freq_start_hz": 2245, "freq_end_hz": 2285 },
+    { "freq_start_hz": 2300, "freq_end_hz": 2340 },
+    { "freq_start_hz": 2355, "freq_end_hz": 2395 },
+    { "freq_start_hz": 2410, "freq_end_hz": 2450 },
+    { "freq_start_hz": 2845, "freq_end_hz": 2890 },
+    { "freq_start_hz": 2975, "freq_end_hz": 3015 },
+    { "freq_start_hz": 3025, "freq_end_hz": 3065 },
+    { "freq_start_hz": 3105, "freq_end_hz": 3150 },
+    { "freq_start_hz": 3260, "freq_end_hz": 3315 },
+    { "freq_start_hz": 3410, "freq_end_hz": 3450 },
+    { "freq_start_hz": 3540, "freq_end_hz": 3570 },
+    { "freq_start_hz": 3600, "freq_end_hz": 3640 },
+    { "freq_start_hz": 3660, "freq_end_hz": 3700 },
+    { "freq_start_hz": 3720, "freq_end_hz": 3760 },
+    { "freq_start_hz": 3830, "freq_end_hz": 3870 },
+    { "freq_start_hz": 3895, "freq_end_hz": 3935 },
+    { "freq_start_hz": 4120, "freq_end_hz": 4165 },
+    { "freq_start_hz": 4230, "freq_end_hz": 4275 },
+    { "freq_start_hz": 4410, "freq_end_hz": 4460 },
+    { "freq_start_hz": 4545, "freq_end_hz": 4590 }
+],
+
+
+    "drums": [
+        {"freq_start_hz": 20,  "freq_end_hz": 100},  
+        {"freq_start_hz": 100,  "freq_end_hz": 130},
+        {"freq_start_hz": 190,  "freq_end_hz": 230},
+        {"freq_start_hz": 280,  "freq_end_hz": 330}
+    ],
+    "bass": [
+        {"freq_start_hz": 60, "freq_end_hz": 100},
+        {"freq_start_hz": 150, "freq_end_hz": 200},
+        {"freq_start_hz": 240, "freq_end_hz": 280}
+    ],
+    "other": [
+        {"freq_start_hz": 20, "freq_end_hz": 40}
+    ]
 }
 
-
-# --- 2. SIMULATION OF DSP CORE FUNCTIONS (Uses NumPy for simplicity) ---
+# --- 2. SIMULATION OF DSP CORE FUNCTIONS ---
 
 def custom_fft(x):
     """ Simulates custom_fft. """
@@ -28,32 +82,38 @@ def custom_ifft(X):
     """ Simulates custom_ifft. """
     return np.fft.ifft(X)
 
-def apply_equalization_for_isolation(full_fft_data, Fs, pass_band_start, pass_band_end):
+def apply_equalization_for_isolation(full_fft_data, Fs, frequency_ranges):
     """
-    Simulates the core logic: Zero out ALL frequencies EXCEPT the source's range.
-    Uses a linear scale factor of 1.0 (unity gain) for the passband.
+    Simulates the core logic: Zero out ALL frequencies EXCEPT the source's ranges.
+    Accepts a LIST of ranges (bands) and combines them.
     """
     N = len(full_fft_data)
     # Start with a zeroed array to hold ONLY the isolated frequency components
     isolated_fft = np.zeros_like(full_fft_data, dtype=complex)
     freq_step = Fs / N
 
-    # Calculate array indices for the pass band (positive frequencies)
-    k_start = int(np.floor(pass_band_start / freq_step))
-    k_end = int(np.ceil(pass_band_end / freq_step))
+    # Iterate over every band defined for this instrument
+    for band in frequency_ranges:
+        pass_band_start = band["freq_start_hz"]
+        pass_band_end = band["freq_end_hz"]
 
-    k_end_max = N // 2
-    k_start = max(0, k_start)
-    k_end = min(k_end_max, k_end)
+        # Calculate array indices for the pass band (positive frequencies)
+        k_start = int(np.floor(pass_band_start / freq_step))
+        k_end = int(np.ceil(pass_band_end / freq_step))
 
-    # 1. Isolate positive frequencies: Copy the FFT data only within the range
-    isolated_fft[k_start:k_end] = full_fft_data[k_start:k_end]
+        k_end_max = N // 2
+        k_start = max(0, k_start)
+        k_end = min(k_end_max, k_end)
 
-    # 2. Isolate negative frequencies (conjugate symmetry)
-    if k_start > 0:
-        k_neg_start = N - k_end
-        k_neg_end = N - k_start
-        isolated_fft[k_neg_start:k_neg_end] = full_fft_data[k_neg_start:k_neg_end]
+        # 1. Isolate positive frequencies: Copy the FFT data 
+        # (+= allows overlapping bands without issues, though = is fine if distinct)
+        isolated_fft[k_start:k_end] = full_fft_data[k_start:k_end]
+
+        # 2. Isolate negative frequencies (conjugate symmetry)
+        if k_start > 0:
+            k_neg_start = N - k_end
+            k_neg_end = N - k_start
+            isolated_fft[k_neg_start:k_neg_end] = full_fft_data[k_neg_start:k_neg_end]
 
     return isolated_fft
 
@@ -68,17 +128,27 @@ def load_audio_to_numpy(filepath):
 
         Fs = audio.frame_rate
         samples = np.array(audio.get_array_of_samples())
-        max_val = np.iinfo(samples.dtype).max
+        
+        # Handle different bit depths
+        if samples.dtype == np.int16:
+            max_val = 32768
+        elif samples.dtype == np.int32:
+            max_val = 2147483648
+        else:
+            max_val = np.iinfo(samples.dtype).max
+            
         signal_float = samples.astype(np.float64) / max_val
         
         return signal_float, Fs
         
     except Exception as e:
-        print(f"Error processing audio file: {e}. Check if dependencies (like FFmpeg for pydub) are installed.")
+        print(f"Error processing audio file: {e}. Check if dependencies (like FFmpeg) are installed.")
         return None, None
 
 def save_numpy_to_wav(signal_float, Fs, filepath):
-    """ Saves a float NumPy array to a WAV file (simulating audio_util.py) """
+    """ Saves a float NumPy array to a WAV file """
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
     sf.write(filepath, signal_float, Fs, format='WAV', subtype='PCM_16')
 
 # --- 4. MAIN TEST LOGIC ---
@@ -95,14 +165,20 @@ def run_static_separation_test():
     print("--- 2. Performing FFT on the Mixed Signal ---")
     full_fft_data = custom_fft(mix_time_series)
 
-    for source_name, band in MUSICAL_SEPARATION_RANGES.items():
-        output_filename = f"../output/equalizer/2/{source_name}.wav" # DISTINCT OUTPUT NAME
+    # Create output directory
+    output_dir = "../output/output_stems"
+    
+    for source_name, bands in MUSICAL_SEPARATION_RANGES.items():
+        output_filename = f"{output_dir}/{source_name}.wav"
         
-        print(f"\n--- Isolating '{source_name}' ({band['freq_start_hz']} Hz - {band['freq_end_hz']} Hz) ---")
+        # Print info about all bands being processed for this instrument
+        print(f"\n--- Isolating '{source_name}' ---")
+        for i, band in enumerate(bands):
+            print(f"   Band {i+1}: {band['freq_start_hz']} Hz - {band['freq_end_hz']} Hz")
         
-        # A. Apply static filtering (isolation)
+        # A. Apply static filtering (isolation) with MULTIPLE bands
         isolated_fft = apply_equalization_for_isolation(
-            full_fft_data, Fs, band['freq_start_hz'], band['freq_end_hz']
+            full_fft_data, Fs, bands
         )
         
         # B. Inverse FFT to convert back to time domain
@@ -112,9 +188,9 @@ def run_static_separation_test():
         isolated_time_series_real = isolated_time_series_complex.real
         save_numpy_to_wav(isolated_time_series_real, Fs, output_filename)
         
-        print(f"  -> Saved output to {output_filename}")
+        print(f"   -> Saved output to {output_filename}")
         
-    print("\n--- Test Complete ---")
+    print(f"\n--- Test Complete. Check the '{output_dir}' folder. ---")
 
 if __name__ == "__main__":
     run_static_separation_test()
