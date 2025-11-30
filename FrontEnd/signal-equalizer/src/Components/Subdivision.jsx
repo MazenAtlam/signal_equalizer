@@ -183,7 +183,7 @@ const Subdivision = ({
     return bandRowMap;
   };
 
-  // Update rows when bands change or active band changes
+  // Update rows when bands change or active band changes - FIXED: Prevent infinite loop
   useEffect(() => {
     if (localBands.length > 0) {
       const newBandRows = activeBandId
@@ -192,14 +192,21 @@ const Subdivision = ({
 
       setBandRows(newBandRows);
 
-      setLocalBands(prevBands =>
-          prevBands.map(band => ({
-            ...band,
-            row: newBandRows[band.id] || 0
-          }))
+      // Only update localBands if the row assignments actually changed
+      const hasRowAssignmentsChanged = localBands.some(band =>
+          band.row !== (newBandRows[band.id] || 0)
       );
+
+      if (hasRowAssignmentsChanged) {
+        setLocalBands(prevBands =>
+            prevBands.map(band => ({
+              ...band,
+              row: newBandRows[band.id] || 0
+            }))
+        );
+      }
     }
-  }, [localBands, activeBandId]);
+  }, [localBands, activeBandId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Original row assignment (for when no band is active)
   const assignBandsToRows = (bands) => {
