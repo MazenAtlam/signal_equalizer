@@ -41,6 +41,12 @@ const GenericMode = () => {
     // Reset both playback states
     setAudioPlaybackState({ currentTime: 0, isPlaying: false });
     setCinePlaybackState({ currentTime: 0, isPlaying: false });
+
+    // Store signal ID for equalizer
+    if (data.input?.signal_id) {
+      localStorage.setItem('currentSignalId', data.input.signal_id);
+    }
+
     showToast("Audio data loaded successfully", "success");
   };
 
@@ -59,7 +65,7 @@ const GenericMode = () => {
   };
 
   const handleViewerVisibilityChange = (viewerName, isVisible) => {
-    if (isVisible && !audioData) {
+    if (isVisible && !audioData && viewerName !== "genericEqualizer") {
       showToast("Please upload an audio file or load sample data first", "error");
       return;
     }

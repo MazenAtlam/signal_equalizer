@@ -168,7 +168,69 @@ export const downloadOutputAudio = async (signalId) => {
   }
 };
 
+/**
+ * Apply equalizer settings to audio
+ * @param {string} signalId - Signal ID to equalize
+ * @param {Array} equalizerScheme - Array of equalizer bands with start_frequency, end_frequency, and scale_value
+ * @returns {Promise<Object>} Response with equalized audio data
+ */
+export const equalizeAudio = async (signalId, equalizerScheme) => {
+  try {
+    const payload = {
+      signal_id: signalId,
+      count: equalizerScheme.length,
+      equalizer_scheme: equalizerScheme
+    };
+
+    const response = await fetch(`${API_BASE_URL}/api/equalizer/equalize`, {
+      method: "POST",
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response
+          .json()
+          .catch(() => ({ error: "Unknown error" }));
+      throw new Error(
+          errorData.error || `HTTP error! status: ${response.status}`
+      );
+    }
+
+    const data = await response.json();
+
+    // Transform response to match our app's data structure
+    const transformedData = data?.data
+        ? {
+          signal_id: data.signal_id ?? data.data.signal_id,
+          frequencies: data.data.frequency_arr || data.data.frequencies,
+          magnitudes_db: data.data.magnitude_arr || data.data.magnitudes_db,
+          full_time_series: data.data.time_series || data.data.full_time_series,
+          Fs: data.data.Fs ?? data.Fs,
+          duration: data.data.duration ?? data.duration,
+          spectrogram_data: data.data.spectrogram || data.data.spectrogram_data,
+        }
+        : {
+          signal_id: data.signal_id,
+          frequencies: data.frequency_arr || data.frequencies,
+          magnitudes_db: data.magnitude_arr || data.magnitudes_db,
+          full_time_series: data.time_series || data.full_time_series,
+          Fs: data.Fs,
+          duration: data.duration,
+          spectrogram_data: data.spectrogram || data.spectrogram_data,
+        };
+
+    return normalizeApiPayload(transformedData);
+  } catch (error) {
+    console.error("Error applying equalizer:", error);
+    throw error;
+  }
+};
+
 export default {
   uploadAudio,
   downloadOutputAudio,
+  equalizeAudio,
 };
