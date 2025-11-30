@@ -63,7 +63,7 @@ def custom_ifft(X):
     x_n = custom_fft(np.conj(X))
     
     # 2. Divide by N and take the conjugate again
-    return np.conj(x_n) / N
+    return np.conj(x_n) / N    # a mathematical property IFFT(X) = 1/N conj(FFT(conj(X)))
 
 
 

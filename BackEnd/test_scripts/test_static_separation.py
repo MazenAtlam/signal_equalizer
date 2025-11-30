@@ -6,69 +6,24 @@ import os
 # --- 1. CONFIGURATION ---
 
 # Path to your input file
-TEST_FILE_INPUT = '../input/input.wav' 
+TEST_FILE_INPUT = r'../input/animals.wav' 
 
 # REVISED: Now accepts a LIST of frequency ranges for each instrument.
 # You can add as many bands as you want for a single instrument.
 MUSICAL_SEPARATION_RANGES = {
 "vocals": [
-    { "freq_start_hz": 280, "freq_end_hz": 310 },
-    { "freq_start_hz": 340, "freq_end_hz": 370 },
-    { "freq_start_hz": 500, "freq_end_hz": 535 },
-    { "freq_start_hz": 565, "freq_end_hz": 595 },
-    { "freq_start_hz": 660, "freq_end_hz": 710 },
-    { "freq_start_hz": 755, "freq_end_hz": 790 },
-    { "freq_start_hz": 855, "freq_end_hz": 890 },
-    { "freq_start_hz": 970, "freq_end_hz": 1000 },
-    { "freq_start_hz": 1020, "freq_end_hz": 1060 },
-    { "freq_start_hz": 1190, "freq_end_hz": 1250 },
-    { "freq_start_hz": 1285, "freq_end_hz": 1325 },
-    { "freq_start_hz": 1345, "freq_end_hz": 1385 },
-    { "freq_start_hz": 1400, "freq_end_hz": 1440 },
-    { "freq_start_hz": 1535, "freq_end_hz": 1575 },
-    { "freq_start_hz": 1720, "freq_end_hz": 1755 },
-    { "freq_start_hz": 1785, "freq_end_hz": 1820 },
-    { "freq_start_hz": 1835, "freq_end_hz": 1885 },
-    { "freq_start_hz": 1900, "freq_end_hz": 1950 },
-    { "freq_start_hz": 1985, "freq_end_hz": 2025 },
-    { "freq_start_hz": 2040, "freq_end_hz": 2080 },
-    { "freq_start_hz": 2090, "freq_end_hz": 2130 },
-    { "freq_start_hz": 2245, "freq_end_hz": 2285 },
-    { "freq_start_hz": 2300, "freq_end_hz": 2340 },
-    { "freq_start_hz": 2355, "freq_end_hz": 2395 },
-    { "freq_start_hz": 2410, "freq_end_hz": 2450 },
-    { "freq_start_hz": 2845, "freq_end_hz": 2890 },
-    { "freq_start_hz": 2975, "freq_end_hz": 3015 },
-    { "freq_start_hz": 3025, "freq_end_hz": 3065 },
-    { "freq_start_hz": 3105, "freq_end_hz": 3150 },
-    { "freq_start_hz": 3260, "freq_end_hz": 3315 },
-    { "freq_start_hz": 3410, "freq_end_hz": 3450 },
-    { "freq_start_hz": 3540, "freq_end_hz": 3570 },
-    { "freq_start_hz": 3600, "freq_end_hz": 3640 },
-    { "freq_start_hz": 3660, "freq_end_hz": 3700 },
-    { "freq_start_hz": 3720, "freq_end_hz": 3760 },
-    { "freq_start_hz": 3830, "freq_end_hz": 3870 },
-    { "freq_start_hz": 3895, "freq_end_hz": 3935 },
-    { "freq_start_hz": 4120, "freq_end_hz": 4165 },
-    { "freq_start_hz": 4230, "freq_end_hz": 4275 },
-    { "freq_start_hz": 4410, "freq_end_hz": 4460 },
-    { "freq_start_hz": 4545, "freq_end_hz": 4590 }
+    { "freq_start_hz": 200, "freq_end_hz": 800 }
 ],
 
 
     "drums": [
-        {"freq_start_hz": 20,  "freq_end_hz": 100},  
-        {"freq_start_hz": 100,  "freq_end_hz": 130},
-        {"freq_start_hz": 190,  "freq_end_hz": 230},
-        {"freq_start_hz": 280,  "freq_end_hz": 330}
+        {"freq_start_hz": 800,  "freq_end_hz": 3000}
     ],
     "bass": [
-        {"freq_start_hz": 60, "freq_end_hz": 100},
-        {"freq_start_hz": 150, "freq_end_hz": 200},
-        {"freq_start_hz": 240, "freq_end_hz": 280}
+        {"freq_start_hz": 3000, "freq_end_hz": 5000}
     ],
     "other": [
-        {"freq_start_hz": 20, "freq_end_hz": 40}
+        {"freq_start_hz": 5000, "freq_end_hz": 8000 }
     ]
 }
 
@@ -166,7 +121,7 @@ def run_static_separation_test():
     full_fft_data = custom_fft(mix_time_series)
 
     # Create output directory
-    output_dir = "../output/output_stems"
+    output_dir = r"../output/output_stems/animals"
     
     for source_name, bands in MUSICAL_SEPARATION_RANGES.items():
         output_filename = f"{output_dir}/{source_name}.wav"
