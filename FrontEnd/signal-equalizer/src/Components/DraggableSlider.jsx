@@ -12,6 +12,8 @@ const DraggableSlider = ({
                              isActive,
                              rowHeight = 160,
                              rowMarginTop = 130,
+                             onDragStart, // Add this prop
+                             disabled = false, // New disabled prop
                          }) => {
     const [isDraggingGain, setIsDraggingGain] = useState(false);
     const [isDraggingPosition, setIsDraggingPosition] = useState(false);
@@ -76,9 +78,12 @@ const DraggableSlider = ({
     // Handle vertical dragging for gain adjustment - with natural sensitivity
     const handleGainMouseDown = useCallback(
         (e) => {
+            if (disabled) return; // Don't allow dragging when disabled
+
             e.preventDefault();
             e.stopPropagation();
             setIsDraggingGain(true);
+            onDragStart?.(); // Notify parent that dragging started
 
             if (!sliderRef.current) return;
 
@@ -119,17 +124,20 @@ const DraggableSlider = ({
             document.addEventListener("mousemove", handleMouseMove);
             document.addEventListener("mouseup", handleMouseUp);
         },
-        [band, onGainChange]
+        [band, onGainChange, onDragStart, disabled]
     );
 
     // Handle horizontal dragging for position adjustment
     const handlePositionMouseDown = useCallback(
         (e) => {
+            if (disabled) return; // Don't allow dragging when disabled
+
             if (e.target.classList.contains("width-handle")) return;
 
             e.preventDefault();
             e.stopPropagation();
             setIsDraggingPosition(true);
+            onDragStart?.(); // Notify parent that dragging started
 
             const handleMouseMove = (moveEvent) => {
                 const subdivisionContainer = document.querySelector(
@@ -162,15 +170,18 @@ const DraggableSlider = ({
 
             handleMouseMove(e);
         },
-        [band.id, onPositionChange]
+        [band.id, onPositionChange, onDragStart, disabled]
     );
 
     // Handle width dragging for bandwidth adjustment
     const handleWidthMouseDown = useCallback(
         (e, isLeftHandle = false) => {
+            if (disabled) return; // Don't allow dragging when disabled
+
             e.preventDefault();
             e.stopPropagation();
             setIsDraggingWidth(true);
+            onDragStart?.(); // Notify parent that dragging started
 
             const startX = e.clientX;
             const startBandwidth = band.bandwidth || 1;
@@ -216,12 +227,14 @@ const DraggableSlider = ({
             document.addEventListener("mousemove", handleMouseMove);
             document.addEventListener("mouseup", handleMouseUp);
         },
-        [band.id, band.bandwidth, band.position, onBandwidthChange, onPositionChange]
+        [band.id, band.bandwidth, band.position, onBandwidthChange, onPositionChange, onDragStart, disabled]
     );
 
     // Handle click for gain adjustment
     const handleGainClick = useCallback(
         (e) => {
+            if (disabled) return; // Don't allow clicking when disabled
+
             e.stopPropagation();
             if (!sliderRef.current) return;
 
@@ -235,10 +248,10 @@ const DraggableSlider = ({
 
             onGainChange(band.id, clampedValue);
         },
-        [band, onGainChange]
+        [band, onGainChange, disabled]
     );
 
-    // Calculate slider fill percentage
+    // Calculate slider fill percentage for linear gain (0 to 4)
     const fillPercentage = ((band.value - band.min) / (band.max - band.min)) * 100;
 
     // Calculate z-index based on active state and row
@@ -263,15 +276,16 @@ const DraggableSlider = ({
                 flexDirection: "column",
                 alignItems: "center",
                 zIndex: zIndex,
-                cursor: isDraggingPosition ? "grabbing" : "grab",
+                cursor: disabled ? 'not-allowed' : (isDraggingPosition ? "grabbing" : "grab"),
                 transition: isDraggingPosition || isDraggingWidth ? "none" : "all 0.2s ease",
                 padding: "10px 0",
                 // Add background for better visibility in higher rows
                 backgroundColor: !isMainRow ? "rgba(31, 213, 249, 0.05)" : "transparent",
                 borderRadius: "8px",
                 border: !isMainRow ? "1px solid rgba(31, 213, 249, 0.2)" : "none",
+                opacity: disabled ? 0.7 : 1, // Visual indication when disabled
             }}
-            onMouseDown={handlePositionMouseDown}
+            onMouseDown={disabled ? undefined : handlePositionMouseDown}
         >
             {/* Row indicator */}
             <div
@@ -299,7 +313,7 @@ const DraggableSlider = ({
                     textAlign: "center",
                     maxWidth: "160px",
                     wordBreak: "break-word",
-                    cursor: "grab",
+                    cursor: disabled ? 'not-allowed' : 'grab',
                     userSelect: "none",
                     backgroundColor: isDraggingPosition
                         ? isMainRow ? "rgba(31, 213, 249, 0.3)" : "rgba(16, 185, 129, 0.3)"
@@ -313,7 +327,7 @@ const DraggableSlider = ({
                     fontWeight: "bold",
                 }}
             >
-                {rangeLabel}
+                {band.label} ({rangeLabel})
             </div>
 
             {/* Width control section */}
@@ -338,15 +352,15 @@ const DraggableSlider = ({
                         borderRadius: "1px",
                         opacity: isDraggingWidth ? 1 : 0.7,
                         transition: "all 0.2s ease",
-                        cursor: "move",
+                        cursor: disabled ? 'not-allowed' : 'move',
                     }}
-                    onMouseDown={handlePositionMouseDown}
+                    onMouseDown={disabled ? undefined : handlePositionMouseDown}
                 />
 
                 {/* Left width handle */}
                 <div
                     className="width-handle"
-                    onMouseDown={(e) => handleWidthMouseDown(e, true)}
+                    onMouseDown={disabled ? undefined : (e) => handleWidthMouseDown(e, true)}
                     style={{
                         position: "absolute",
                         left: `${-handleSpacing / 2}px`,
@@ -356,7 +370,7 @@ const DraggableSlider = ({
                         height: "14px",
                         backgroundColor: isMainRow ? "#1FD5F9" : "#10B981",
                         borderRadius: "50%",
-                        cursor: "ew-resize",
+                        cursor: disabled ? 'not-allowed' : 'ew-resize',
                         opacity: isDraggingWidth ? 1 : 0.9,
                         transition: "all 0.2s ease",
                         zIndex: 15,
@@ -368,7 +382,7 @@ const DraggableSlider = ({
                 {/* Right width handle */}
                 <div
                     className="width-handle"
-                    onMouseDown={(e) => handleWidthMouseDown(e, false)}
+                    onMouseDown={disabled ? undefined : (e) => handleWidthMouseDown(e, false)}
                     style={{
                         position: "absolute",
                         left: `${handleSpacing / 2}px`,
@@ -378,7 +392,7 @@ const DraggableSlider = ({
                         height: "14px",
                         backgroundColor: isMainRow ? "#1FD5F9" : "#10B981",
                         borderRadius: "50%",
-                        cursor: "ew-resize",
+                        cursor: disabled ? 'not-allowed' : 'ew-resize',
                         opacity: isDraggingWidth ? 1 : 0.9,
                         transition: "all 0.2s ease",
                         zIndex: 15,
@@ -388,7 +402,7 @@ const DraggableSlider = ({
                 />
             </div>
 
-            {/* Value display */}
+            {/* Value display - now showing linear gain */}
             <div
                 style={{
                     fontSize: "10px",
@@ -401,8 +415,7 @@ const DraggableSlider = ({
                     borderRadius: "4px",
                 }}
             >
-                {band.value > 0 ? "+" : ""}
-                {band.value}dB
+                Gain: {band.value.toFixed(2)}x
             </div>
 
             {/* REDESIGNED Vertical Slider with Speed Slider Styling */}
@@ -413,9 +426,9 @@ const DraggableSlider = ({
                     width: "15px",
                     position: "relative",
                     height: "140px",
-                    cursor: "pointer",
+                    cursor: disabled ? 'not-allowed' : 'pointer',
                 }}
-                onClick={handleGainClick}
+                onClick={disabled ? undefined : handleGainClick}
             >
                 {/* Vertical Slider Track */}
                 <div
@@ -460,11 +473,11 @@ const DraggableSlider = ({
                         backgroundColor: "#080808",
                         borderRadius: "50%",
                         transform: "translate(-50%, 50%)",
-                        cursor: isDraggingGain ? "grabbing" : "grab",
+                        cursor: disabled ? 'not-allowed' : (isDraggingGain ? "grabbing" : "grab"),
                         transition: isDraggingGain ? "none" : "bottom 0.1s ease",
                         zIndex: 10,
                     }}
-                    onMouseDown={(e) => {
+                    onMouseDown={disabled ? undefined : (e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         handleGainMouseDown(e);
@@ -492,6 +505,7 @@ const DraggableSlider = ({
             {band.id.startsWith("custom-") && (
                 <button
                     onClick={(e) => {
+                        if (disabled) return;
                         e.stopPropagation();
                         onRemove(band.id);
                     }}
@@ -503,19 +517,20 @@ const DraggableSlider = ({
                         border: "1px solid #ef4444",
                         borderRadius: "4px",
                         padding: "3px 8px",
-                        cursor: "pointer",
-                        opacity: isDraggingPosition ? 0 : 1,
+                        cursor: disabled ? 'not-allowed' : 'pointer',
+                        opacity: isDraggingPosition || disabled ? 0 : 1,
                         transition: "all 0.2s ease",
                         fontWeight: "bold",
                     }}
-                    onMouseEnter={(e) => {
+                    onMouseEnter={disabled ? undefined : (e) => {
                         e.target.style.background = "rgba(239, 68, 68, 0.2)";
                         e.target.style.transform = "scale(1.05)";
                     }}
-                    onMouseLeave={(e) => {
+                    onMouseLeave={disabled ? undefined : (e) => {
                         e.target.style.background = "rgba(239, 68, 68, 0.1)";
                         e.target.style.transform = "scale(1)";
                     }}
+                    disabled={disabled}
                 >
                     Remove Band
                 </button>

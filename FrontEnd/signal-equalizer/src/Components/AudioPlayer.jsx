@@ -4,14 +4,17 @@ import Button from "./Button";
 import PanelControls from "./PanelControls";
 
 const AudioPlayer = ({
-  inputAudioURL,
-  outputAudioURL,
-  inputDuration = 0,
-  outputDuration = 0,
-  onPlaybackUpdate,
-  isVisible = true,
-  onClose,
-}) => {
+                       inputAudioURL,
+                       outputAudioURL,
+                       aiAudioURL, // NEW: AI audio URL
+                       inputDuration = 0,
+                       outputDuration = 0,
+                       aiDuration = 0, // NEW: AI audio duration
+                       onPlaybackUpdate,
+                       isVisible = true,
+                       onClose,
+                       showAIOutput = false, // NEW: Flag to show AI output
+                     }) => {
   const [hovered, setHovered] = useState(false);
   const [inputState, setInputState] = useState({
     isPlaying: false,
@@ -27,31 +30,32 @@ const AudioPlayer = ({
     playbackRate: 1.0,
     error: null,
   });
+  const [aiState, setAIState] = useState({ // NEW: AI audio state
+    isPlaying: false,
+    currentTime: 0,
+    duration: aiDuration,
+    playbackRate: 1.0,
+    error: null,
+  });
 
   const inputAudioRef = useRef(null);
   const outputAudioRef = useRef(null);
+  const aiAudioRef = useRef(null); // NEW: AI audio ref
   const inputAudioURLRef = useRef(inputAudioURL);
   const outputAudioURLRef = useRef(outputAudioURL);
+  const aiAudioURLRef = useRef(aiAudioURL); // NEW: AI audio URL ref
 
-  // Input audio effect - FIXED: Only recreate when URL actually changes
+  // Input audio effect
   useEffect(() => {
     if (!isVisible || !inputAudioURL) return;
 
-    // Only recreate audio if URL actually changed
     if (inputAudioURLRef.current === inputAudioURL && inputAudioRef.current) {
-      console.log("🎵 Input audio URL unchanged, skipping reinitialization");
       return;
     }
 
-    console.log("🎵 Initializing input audio...");
     inputAudioURLRef.current = inputAudioURL;
 
-    // Define event handlers FIRST
     const handleInputLoadedMetadata = () => {
-      console.log(
-        "✅ Input audio metadata loaded, duration:",
-        inputAudioRef.current?.duration
-      );
       setInputState((prev) => ({
         ...prev,
         duration: inputAudioRef.current?.duration || inputDuration,
@@ -75,7 +79,6 @@ const AudioPlayer = ({
     };
 
     const handleInputEnded = () => {
-      console.log("⏹️ Input audio ended");
       setInputState((prev) => ({
         ...prev,
         isPlaying: false,
@@ -84,11 +87,10 @@ const AudioPlayer = ({
     };
 
     const handleInputError = (e) => {
-      console.error("❌ Input audio error:", e);
       setInputState((prev) => ({
         ...prev,
         error: `Audio error: ${
-          inputAudioRef.current?.error?.message || "Unknown error"
+            inputAudioRef.current?.error?.message || "Unknown error"
         }`,
         isPlaying: false,
       }));
@@ -96,19 +98,17 @@ const AudioPlayer = ({
 
     // Clean up previous audio
     if (inputAudioRef.current) {
-
       inputAudioRef.current.removeEventListener(
-        "timeupdate",
-        handleInputTimeUpdate
+          "timeupdate",
+          handleInputTimeUpdate
       );
       inputAudioRef.current.removeEventListener(
-        "loadedmetadata",
-        handleInputLoadedMetadata
+          "loadedmetadata",
+          handleInputLoadedMetadata
       );
       inputAudioRef.current.removeEventListener("ended", handleInputEnded);
       inputAudioRef.current.removeEventListener("error", handleInputError);
 
-      // Only pause if we're creating a new audio element
       if (inputAudioURLRef.current !== inputAudioURL) {
         inputAudioRef.current.pause();
       }
@@ -125,18 +125,15 @@ const AudioPlayer = ({
     audio.addEventListener("ended", handleInputEnded);
     audio.addEventListener("error", handleInputError);
 
-    // Set properties and load
     audio.preload = "auto";
 
     try {
       audio.load();
-      console.log("✅ Input audio loaded successfully");
     } catch (error) {
       console.error("Error loading input audio:", error);
     }
 
     return () => {
-      // Only cleanup when component unmounts or URL changes
       if (audio && inputAudioURLRef.current !== inputAudioURL) {
         audio.removeEventListener("loadedmetadata", handleInputLoadedMetadata);
         audio.removeEventListener("timeupdate", handleInputTimeUpdate);
@@ -147,30 +144,22 @@ const AudioPlayer = ({
         }
       }
     };
-  }, [inputAudioURL, isVisible]); // Removed inputDuration and onPlaybackUpdate from dependencies
+  }, [inputAudioURL, isVisible]);
 
-  // Output audio effect - FIXED: Only recreate when URL actually changes
+  // Output audio effect
   useEffect(() => {
     if (!isVisible || !outputAudioURL) return;
 
-    // Only recreate audio if URL actually changed
     if (
-      outputAudioURLRef.current === outputAudioURL &&
-      outputAudioRef.current
+        outputAudioURLRef.current === outputAudioURL &&
+        outputAudioRef.current
     ) {
-      console.log("🎵 Output audio URL unchanged, skipping reinitialization");
       return;
     }
 
-    console.log("🎵 Initializing output audio...");
     outputAudioURLRef.current = outputAudioURL;
 
-    // Define event handlers FIRST
     const handleOutputLoadedMetadata = () => {
-      console.log(
-        "✅ Output audio metadata loaded, duration:",
-        outputAudioRef.current?.duration
-      );
       setOutputState((prev) => ({
         ...prev,
         duration: outputAudioRef.current?.duration || outputDuration,
@@ -194,7 +183,6 @@ const AudioPlayer = ({
     };
 
     const handleOutputEnded = () => {
-      console.log("⏹️ Output audio ended");
       setOutputState((prev) => ({
         ...prev,
         isPlaying: false,
@@ -203,11 +191,10 @@ const AudioPlayer = ({
     };
 
     const handleOutputError = (e) => {
-      console.error("❌ Output audio error:", e);
       setOutputState((prev) => ({
         ...prev,
         error: `Audio error: ${
-          outputAudioRef.current?.error?.message || "Unknown error"
+            outputAudioRef.current?.error?.message || "Unknown error"
         }`,
         isPlaying: false,
       }));
@@ -215,19 +202,17 @@ const AudioPlayer = ({
 
     // Clean up previous audio
     if (outputAudioRef.current) {
-
       outputAudioRef.current.removeEventListener(
-        "timeupdate",
-        handleOutputTimeUpdate
+          "timeupdate",
+          handleOutputTimeUpdate
       );
       outputAudioRef.current.removeEventListener(
-        "loadedmetadata",
-        handleOutputLoadedMetadata
+          "loadedmetadata",
+          handleOutputLoadedMetadata
       );
       outputAudioRef.current.removeEventListener("ended", handleOutputEnded);
       outputAudioRef.current.removeEventListener("error", handleOutputError);
 
-      // Only pause if we're creating a new audio element
       if (outputAudioURLRef.current !== outputAudioURL) {
         outputAudioRef.current.pause();
       }
@@ -244,18 +229,15 @@ const AudioPlayer = ({
     audio.addEventListener("ended", handleOutputEnded);
     audio.addEventListener("error", handleOutputError);
 
-    // Set properties and load
     audio.preload = "auto";
 
     try {
       audio.load();
-      console.log("✅ Output audio loaded successfully");
     } catch (error) {
       console.error("Error loading output audio:", error);
     }
 
     return () => {
-      // Only cleanup when component unmounts or URL changes
       if (audio && outputAudioURLRef.current !== outputAudioURL) {
         audio.removeEventListener("loadedmetadata", handleOutputLoadedMetadata);
         audio.removeEventListener("timeupdate", handleOutputTimeUpdate);
@@ -266,13 +248,115 @@ const AudioPlayer = ({
         }
       }
     };
-  }, [outputAudioURL, isVisible]); // Removed outputDuration and onPlaybackUpdate from dependencies
+  }, [outputAudioURL, isVisible]);
 
-  // Control functions
+  // NEW: AI audio effect
+  useEffect(() => {
+    if (!isVisible || !aiAudioURL || !showAIOutput) return;
+
+    if (
+        aiAudioURLRef.current === aiAudioURL &&
+        aiAudioRef.current
+    ) {
+      return;
+    }
+
+    aiAudioURLRef.current = aiAudioURL;
+
+    const handleAILoadedMetadata = () => {
+      setAIState((prev) => ({
+        ...prev,
+        duration: aiAudioRef.current?.duration || aiDuration,
+        error: null,
+      }));
+    };
+
+    const handleAITimeUpdate = () => {
+      const currentTime = aiAudioRef.current?.currentTime || 0;
+      const isPlaying = !aiAudioRef.current?.paused;
+
+      setAIState((prev) => ({
+        ...prev,
+        currentTime: currentTime,
+        isPlaying: isPlaying,
+      }));
+
+      if (onPlaybackUpdate && isPlaying) {
+        onPlaybackUpdate(currentTime, true);
+      }
+    };
+
+    const handleAIEnded = () => {
+      setAIState((prev) => ({
+        ...prev,
+        isPlaying: false,
+        currentTime: 0,
+      }));
+    };
+
+    const handleAIError = (e) => {
+      setAIState((prev) => ({
+        ...prev,
+        error: `Audio error: ${
+            aiAudioRef.current?.error?.message || "Unknown error"
+        }`,
+        isPlaying: false,
+      }));
+    };
+
+    // Clean up previous audio
+    if (aiAudioRef.current) {
+      aiAudioRef.current.removeEventListener(
+          "timeupdate",
+          handleAITimeUpdate
+      );
+      aiAudioRef.current.removeEventListener(
+          "loadedmetadata",
+          handleAILoadedMetadata
+      );
+      aiAudioRef.current.removeEventListener("ended", handleAIEnded);
+      aiAudioRef.current.removeEventListener("error", handleAIError);
+
+      if (aiAudioURLRef.current !== aiAudioURL) {
+        aiAudioRef.current.pause();
+      }
+      aiAudioRef.current = null;
+    }
+
+    // Create new audio element
+    const audio = new Audio(aiAudioURL);
+    aiAudioRef.current = audio;
+
+    // Add event listeners
+    audio.addEventListener("loadedmetadata", handleAILoadedMetadata);
+    audio.addEventListener("timeupdate", handleAITimeUpdate);
+    audio.addEventListener("ended", handleAIEnded);
+    audio.addEventListener("error", handleAIError);
+
+    audio.preload = "auto";
+
+    try {
+      audio.load();
+    } catch (error) {
+      console.error("Error loading AI audio:", error);
+    }
+
+    return () => {
+      if (audio && aiAudioURLRef.current !== aiAudioURL) {
+        audio.removeEventListener("loadedmetadata", handleAILoadedMetadata);
+        audio.removeEventListener("timeupdate", handleAITimeUpdate);
+        audio.removeEventListener("ended", handleAIEnded);
+        audio.removeEventListener("error", handleAIError);
+        if (!isVisible) {
+          audio.pause();
+        }
+      }
+    };
+  }, [aiAudioURL, isVisible, showAIOutput]);
+
+  // Control functions for Input
   const handleInputPlay = async () => {
-    console.log("▶️ Input play requested");
     if (!inputAudioRef.current) {
-      console.error("❌ No input audio reference");
       setInputState((prev) => ({ ...prev, error: "Audio not initialized" }));
       return;
     }
@@ -281,19 +365,11 @@ const AudioPlayer = ({
 
     try {
       if (audio.paused) {
-        console.log("Starting input playback...");
-
-        // REMOVED: Automatic stopping of output audio
-        // Let each audio play independently
-
         await audio.play();
-        console.log("✅ Input audio play successful");
       } else {
-        console.log("Pausing input playback...");
         audio.pause();
       }
     } catch (error) {
-      console.error("❌ Input audio play failed:", error);
       setInputState((prev) => ({
         ...prev,
         error: `Play failed: ${error.message}`,
@@ -331,10 +407,9 @@ const AudioPlayer = ({
     }
   };
 
+  // Control functions for Output
   const handleOutputPlay = async () => {
-    console.log("▶️ Output play requested");
     if (!outputAudioRef.current) {
-      console.error("❌ No output audio reference");
       setOutputState((prev) => ({ ...prev, error: "Audio not initialized" }));
       return;
     }
@@ -343,19 +418,11 @@ const AudioPlayer = ({
 
     try {
       if (audio.paused) {
-        console.log("Starting output playback...");
-
-        // REMOVED: Automatic stopping of input audio
-        // Let each audio play independently
-
         await audio.play();
-        console.log("✅ Output audio play successful");
       } else {
-        console.log("Pausing output playback...");
         audio.pause();
       }
     } catch (error) {
-      console.error("❌ Output audio play failed:", error);
       setOutputState((prev) => ({
         ...prev,
         error: `Play failed: ${error.message}`,
@@ -393,116 +460,243 @@ const AudioPlayer = ({
     }
   };
 
+  // NEW: Control functions for AI Output
+  const handleAIPlay = async () => {
+    if (!aiAudioRef.current) {
+      setAIState((prev) => ({ ...prev, error: "Audio not initialized" }));
+      return;
+    }
+
+    const audio = aiAudioRef.current;
+
+    try {
+      if (audio.paused) {
+        await audio.play();
+      } else {
+        audio.pause();
+      }
+    } catch (error) {
+      setAIState((prev) => ({
+        ...prev,
+        error: `Play failed: ${error.message}`,
+        isPlaying: false,
+      }));
+    }
+  };
+
+  const handleAIStop = () => {
+    if (aiAudioRef.current) {
+      aiAudioRef.current.pause();
+      aiAudioRef.current.currentTime = 0;
+      setAIState((prev) => ({ ...prev, isPlaying: false, currentTime: 0 }));
+    }
+  };
+
+  const handleAIReset = () => {
+    if (aiAudioRef.current) {
+      aiAudioRef.current.playbackRate = 1.0;
+      setAIState((prev) => ({ ...prev, playbackRate: 1.0 }));
+    }
+  };
+
+  const handleAISpeedChange = (speed) => {
+    if (aiAudioRef.current) {
+      aiAudioRef.current.playbackRate = speed;
+      setAIState((prev) => ({ ...prev, playbackRate: speed }));
+    }
+  };
+
+  const handleAITimeChange = (time) => {
+    if (aiAudioRef.current) {
+      aiAudioRef.current.currentTime = time;
+      setAIState((prev) => ({ ...prev, currentTime: time }));
+    }
+  };
+
   if (!isVisible) {
     return null;
   }
 
   return (
-    <Card className="audio-player col-10 mx-auto">
-      <div className="audio-player-header d-flex justify-content-between pt-3 pe-4">
-        <div className="audio-player-title d-flex px-4 pt-2">
-          <svg
-            className="audio-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#fbbf24"
-            strokeWidth="2"
-            width="28"
-            height="28"
-          >
-            <path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"></path>
-          </svg>
-          <h5 className="ms-2">Audio Playbacks</h5>
-        </div>
-        <Button
-          variant="secondary"
-          className="close-btn border-0"
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
-          onClick={() => {
-            if (inputAudioRef.current) {
-              inputAudioRef.current.pause();
-              inputAudioRef.current = null;
-            }
-            if (outputAudioRef.current) {
-              outputAudioRef.current.pause();
-              outputAudioRef.current = null;
-            }
-            onClose && onClose();
-          }}
-          style={
-            hovered
-              ? {
-                  backgroundColor: "#7bf447ff",
-                  borderRadius: "4px",
-                  color: "#000000 !important",
+      <Card className="audio-player col-10 mx-auto">
+        <div className="audio-player-header d-flex justify-content-between pt-3 pe-4">
+          <div className="audio-player-title d-flex px-4 pt-2">
+            <svg
+                className="audio-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#fbbf24"
+                strokeWidth="2"
+                width="28"
+                height="28"
+            >
+              <path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"></path>
+            </svg>
+            <h5 className="ms-2">Audio Playbacks</h5>
+          </div>
+          <Button
+              variant="secondary"
+              className="close-btn border-0"
+              onMouseEnter={() => setHovered(true)}
+              onMouseLeave={() => setHovered(false)}
+              onClick={() => {
+                if (inputAudioRef.current) {
+                  inputAudioRef.current.pause();
+                  inputAudioRef.current = null;
                 }
-              : { backgroundColor: "transparent", borderRadius: "4px" }
-          }
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#fff"
-            strokeWidth="2"
-            width="16"
-            height="16"
+                if (outputAudioRef.current) {
+                  outputAudioRef.current.pause();
+                  outputAudioRef.current = null;
+                }
+                if (aiAudioRef.current) {
+                  aiAudioRef.current.pause();
+                  aiAudioRef.current = null;
+                }
+                onClose && onClose();
+              }}
+              style={
+                hovered
+                    ? {
+                      backgroundColor: "#7bf447ff",
+                      borderRadius: "4px",
+                      color: "#000000 !important",
+                    }
+                    : { backgroundColor: "transparent", borderRadius: "4px" }
+              }
           >
-            <path d="M18 6 6 18"></path>
-            <path d="m6 6 12 12"></path>
-          </svg>
-        </Button>
-      </div>
-
-      {/* Error Display */}
-      {(inputState.error || outputState.error) && (
-        <div className="px-4 mt-3">
-          {inputState.error && (
-            <div className="alert alert-warning mb-2">
-              <strong>Input Audio Error:</strong> {inputState.error}
-            </div>
-          )}
-          {outputState.error && (
-            <div className="alert alert-warning mb-2">
-              <strong>Output Audio Error:</strong> {outputState.error}
-            </div>
-          )}
+            <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#fff"
+                strokeWidth="2"
+                width="16"
+                height="16"
+            >
+              <path d="M18 6 6 18"></path>
+              <path d="m6 6 12 12"></path>
+            </svg>
+          </Button>
         </div>
-      )}
 
-      <div className="audio-players-grid px-4 d-flex gap-3 my-4">
-        <Card className="audio-panel col-6">
-          <h4 className="panel-title px-4 py-2">Input Audio</h4>
-          <PanelControls
-            type="audio"
-            isPlaying={inputState.isPlaying}
-            currentTime={inputState.currentTime}
-            duration={inputState.duration}
-            playbackRate={inputState.playbackRate}
-            onPlay={handleInputPlay}
-            onStop={handleInputStop}
-            onReset={handleInputReset}
-            onSpeedChange={handleInputSpeedChange}
-            onTimeChange={handleInputTimeChange}
-          />
-        </Card>
-        <Card className="audio-panel col-6">
-          <h4 className="panel-title px-4 py-2">Output Audio</h4>
-          <PanelControls
-            type="audio"
-            isPlaying={outputState.isPlaying}
-            currentTime={outputState.currentTime}
-            duration={outputState.duration}
-            playbackRate={outputState.playbackRate}
-            onPlay={handleOutputPlay}
-            onStop={handleOutputStop}
-            onReset={handleOutputReset}
-            onSpeedChange={handleOutputSpeedChange}
-            onTimeChange={handleOutputTimeChange}
-          />
-        </Card>
-      </div>
-    </Card>
+        {/* Error Display */}
+        {(inputState.error || outputState.error || aiState.error) && (
+            <div className="px-4 mt-3">
+              {inputState.error && (
+                  <div className="alert alert-warning mb-2">
+                    <strong>Input Audio Error:</strong> {inputState.error}
+                  </div>
+              )}
+              {outputState.error && (
+                  <div className="alert alert-warning mb-2">
+                    <strong>Output Audio Error:</strong> {outputState.error}
+                  </div>
+              )}
+              {aiState.error && (
+                  <div className="alert alert-warning mb-2">
+                    <strong>AI Audio Error:</strong> {aiState.error}
+                  </div>
+              )}
+            </div>
+        )}
+
+        <div className="audio-players-grid px-4 d-flex gap-3 my-4">
+          {/* Input Audio Card */}
+          <Card className="audio-panel col-4">
+            <h4 className="panel-title px-4 py-2">Input Audio</h4>
+            <PanelControls
+                type="audio"
+                isPlaying={inputState.isPlaying}
+                currentTime={inputState.currentTime}
+                duration={inputState.duration}
+                playbackRate={inputState.playbackRate}
+                onPlay={handleInputPlay}
+                onStop={handleInputStop}
+                onReset={handleInputReset}
+                onSpeedChange={handleInputSpeedChange}
+                onTimeChange={handleInputTimeChange}
+            />
+          </Card>
+
+          {/* Output Audio Card */}
+          <Card className="audio-panel col-4">
+            <h4 className="panel-title px-4 py-2">Output Audio</h4>
+            <PanelControls
+                type="audio"
+                isPlaying={outputState.isPlaying}
+                currentTime={outputState.currentTime}
+                duration={outputState.duration}
+                playbackRate={outputState.playbackRate}
+                onPlay={handleOutputPlay}
+                onStop={handleOutputStop}
+                onReset={handleOutputReset}
+                onSpeedChange={handleOutputSpeedChange}
+                onTimeChange={handleOutputTimeChange}
+            />
+          </Card>
+
+          {/* NEW: AI Output Audio Card */}
+          <Card className="audio-panel col-4">
+            <h4 className="panel-title px-4 py-2" style={{ color: "#7bf447ff" }}>
+              AI Output Audio
+            </h4>
+            {showAIOutput ? (
+                aiAudioURL ? (
+                    <PanelControls
+                        type="audio"
+                        isPlaying={aiState.isPlaying}
+                        currentTime={aiState.currentTime}
+                        duration={aiState.duration}
+                        playbackRate={aiState.playbackRate}
+                        onPlay={handleAIPlay}
+                        onStop={handleAIStop}
+                        onReset={handleAIReset}
+                        onSpeedChange={handleAISpeedChange}
+                        onTimeChange={handleAITimeChange}
+                    />
+                ) : (
+                    <div
+                        style={{
+                          padding: "2rem",
+                          textAlign: "center",
+                          color: "#1FD5F9",
+                        }}
+                    >
+                      <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          width="48"
+                          height="48"
+                          className="mb-3"
+                      >
+                        <path d="M12 8V4H8"></path>
+                        <rect width="16" height="12" x="4" y="8" rx="2"></rect>
+                        <path d="M2 14h2"></path>
+                        <path d="M20 14h2"></path>
+                        <path d="M15 13v2"></path>
+                        <path d="M9 13v2"></path>
+                      </svg>
+                      <p>Waiting for AI Equalization...</p>
+                      <p style={{ color: "#9ca3af", fontSize: "0.8rem", marginTop: "10px" }}>
+                        Click the "AI Equalize" button to process
+                      </p>
+                    </div>
+                )
+            ) : (
+                <div
+                    style={{
+                      padding: "2rem",
+                      textAlign: "center",
+                      color: "#9ca3af",
+                    }}
+                >
+                  AI Output not available in current mode
+                </div>
+            )}
+          </Card>
+        </div>
+      </Card>
   );
 };
 

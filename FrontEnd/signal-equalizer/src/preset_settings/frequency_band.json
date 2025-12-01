@@ -1,0 +1,20 @@
+{
+  "musical": [
+    { "name": "drums", "start_frequency": 6000, "end_frequency": 10000 },
+    { "name": "vocals", "start_frequency": 700, "end_frequency": 2000 },
+    { "name": "others", "start_frequency": 2000, "end_frequency": 6000 },
+    { "name": "bass", "start_frequency": 20, "end_frequency": 700 }
+  ],
+  "human": [
+    { "name": "speaker_1", "start_frequency": 90, "end_frequency": 1300 },
+    { "name": "speaker_2", "start_frequency": 300, "end_frequency": 1700 },
+    { "name": "speaker_3", "start_frequency": 700, "end_frequency": 1800 },
+    { "name": "speaker_4", "start_frequency": 90, "end_frequency": 500 }
+  ],
+  "animal": [
+    { "name": "Dog", "start_frequency": 200, "end_frequency": 800 },
+    { "name": "Donkey", "start_frequency": 800, "end_frequency": 3000 },
+    { "name": "Elephant", "start_frequency": 3000, "end_frequency": 5000 },
+    { "name": "Birds", "start_frequency": 5000, "end_frequency": 8000 }
+  ]
+}
