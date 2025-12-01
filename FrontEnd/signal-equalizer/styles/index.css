@@ -66,6 +66,54 @@ body {
   padding: 0;
 }
 
+/* Mode header styles */
+.mode-header {
+  padding: 1rem 0;
+}
+
+.mode-header h2 {
+  font-size: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.mode-header p {
+  font-size: 1rem;
+  opacity: 0.8;
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #1FD5F9 0%, #7bf447 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Category dropdown styles */
+.category-dropdown select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'><path fill='%23FFFFFF' d='M2 0L0 2h4zm0 5L0 3h4z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 12px;
+  padding-right: 2.5rem;
+}
+
+.category-dropdown select:focus {
+  outline: none;
+  border-color: #1FD5F9;
+  box-shadow: 0 0 0 2px rgba(31, 213, 249, 0.2);
+}
+
+/* Navbar button hover effects */
+.equalizer-navbar button {
+  transition: all 0.2s ease-in-out;
+}
+
+.equalizer-navbar button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
 /* Custom animations */
 @keyframes pulse-glow {
   0%, 100% {

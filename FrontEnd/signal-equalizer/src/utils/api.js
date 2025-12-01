@@ -51,10 +51,14 @@ const normalizeApiPayload = (payload = {}) => {
       payload.full_time_series || payload.time_series || []
   );
   const sampleRate = toNumber(payload.Fs, 44100);
-  const inferredDuration =
-      timeSeries.length > 0 && sampleRate > 0
-          ? timeSeries.length / sampleRate
-          : 0;
+
+  // Calculate duration from time series if not provided
+  let duration = toNumber(payload.duration);
+  if (!Number.isFinite(duration) || duration <= 0) {
+    duration = timeSeries.length > 0 && sampleRate > 0
+        ? timeSeries.length / sampleRate
+        : 1; // Fallback to 1 second
+  }
 
   return {
     signal_id: payload.signal_id || payload.id || null,
@@ -62,7 +66,7 @@ const normalizeApiPayload = (payload = {}) => {
     magnitude_arr: toNumberArray(payload.magnitudes_db || payload.magnitude_arr),
     time_series: timeSeries,
     Fs: sampleRate,
-    duration: toNumber(payload.duration, inferredDuration),
+    duration: duration,
     spectrogram_data: toNumberMatrix(
         payload.spectrogram_data || payload.spectrogram || []
     ),
@@ -182,6 +186,8 @@ export const equalizeAudio = async (signalId, equalizerScheme) => {
       equalizer_scheme: equalizerScheme
     };
 
+    console.log("Sending equalizer request:", payload);
+
     const response = await fetch(`${API_BASE_URL}/api/equalizer/equalize`, {
       method: "POST",
       headers: {
@@ -200,31 +206,117 @@ export const equalizeAudio = async (signalId, equalizerScheme) => {
     }
 
     const data = await response.json();
+    console.log("Equalizer response received:", data);
 
     // Transform response to match our app's data structure
-    const transformedData = data?.data
-        ? {
-          signal_id: data.signal_id ?? data.data.signal_id,
-          frequencies: data.data.frequency_arr || data.data.frequencies,
-          magnitudes_db: data.data.magnitude_arr || data.data.magnitudes_db,
-          full_time_series: data.data.time_series || data.data.full_time_series,
-          Fs: data.data.Fs ?? data.Fs,
-          duration: data.data.duration ?? data.duration,
-          spectrogram_data: data.data.spectrogram || data.data.spectrogram_data,
-        }
-        : {
-          signal_id: data.signal_id,
-          frequencies: data.frequency_arr || data.frequencies,
-          magnitudes_db: data.magnitude_arr || data.magnitudes_db,
-          full_time_series: data.time_series || data.full_time_series,
-          Fs: data.Fs,
-          duration: data.duration,
-          spectrogram_data: data.spectrogram || data.spectrogram_data,
-        };
+    const transformedData = {
+      signal_id: data.signal_id || signalId,
+      frequency_arr: data.frequency_arr || [],
+      magnitude_arr: data.magnitude_arr || [],
+      time_series: data.time_series || [],
+      Fs: data.Fs || 44100,
+      duration: data.duration || 0,
+      spectrogram_data: data.spectrogram || data.spectrogram_data || [],
+    };
 
-    return normalizeApiPayload(transformedData);
+    const normalized = normalizeApiPayload(transformedData);
+
+    console.log("Normalized equalized data:", {
+      timeSeriesLength: normalized.time_series.length,
+      sampleRate: normalized.Fs
+    });
+
+    // Create audio URL from time series for playback
+    if (normalized.time_series.length > 0) {
+      // Use dynamic import to avoid circular dependencies
+      const { createAudioURL } = await import('./audioUtils');
+      const audioURL = createAudioURL(normalized.time_series, normalized.Fs);
+      normalized.audioURL = audioURL;
+      console.log("Generated audioURL:", audioURL);
+    } else {
+      console.warn("No time series data to create audio URL");
+      normalized.audioURL = null;
+    }
+
+    return normalized;
   } catch (error) {
     console.error("Error applying equalizer:", error);
+    throw error;
+  }
+};
+
+/**
+ * Apply AI equalizer settings to audio
+ * @param {string} signalId - Signal ID to equalize
+ * @param {string} customizedModePreset - Preset name ('human', 'musical', 'animal')
+ * @param {Array} equalizerScheme - Array of equalizer bands with name and value
+ * @returns {Promise<Object>} Response with AI-equalized audio data
+ */
+export const equalizeWithAI = async (signalId, customizedModePreset, equalizerScheme) => {
+  try {
+    const payload = {
+      signal_id: signalId,
+      customized_mode_preset: customizedModePreset,
+      equalizer_scheme: equalizerScheme
+    };
+
+    console.log("Sending AI equalizer request:", payload);
+
+    const response = await fetch(`${API_BASE_URL}/api/equalizer/equalize_with_ai`, {
+      method: "POST",
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response
+          .json()
+          .catch(() => ({ error: "Unknown error" }));
+      throw new Error(
+          errorData.error || `HTTP error! status: ${response.status}`
+      );
+    }
+
+    const data = await response.json();
+    console.log("AI Equalizer response received:", data);
+
+    // Transform response to match our app's data structure
+    const transformedData = {
+      signal_id: data.signal_id || signalId,
+      frequency_arr: data.frequency_arr || [],
+      magnitude_arr: data.magnitude_arr || [],
+      time_series: data.time_series || [],
+      Fs: data.Fs || 44100,
+      duration: data.duration || 0,
+      spectrogram_data: data.spectrogram || data.spectrogram_data || [],
+      performance: data.performance || {} // Include performance metrics
+    };
+
+    const normalized = normalizeApiPayload(transformedData);
+    normalized.performance = data.performance; // Preserve performance metrics
+
+    console.log("Normalized AI equalized data:", {
+      timeSeriesLength: normalized.time_series.length,
+      sampleRate: normalized.Fs,
+      performance: normalized.performance
+    });
+
+    // Create audio URL from time series for playback
+    if (normalized.time_series.length > 0) {
+      const { createAudioURL } = await import('./audioUtils');
+      const audioURL = createAudioURL(normalized.time_series, normalized.Fs);
+      normalized.audioURL = audioURL;
+      console.log("Generated audioURL:", audioURL);
+    } else {
+      console.warn("No time series data to create audio URL");
+      normalized.audioURL = null;
+    }
+
+    return normalized;
+  } catch (error) {
+    console.error("Error applying AI equalizer:", error);
     throw error;
   }
 };
@@ -233,4 +325,5 @@ export default {
   uploadAudio,
   downloadOutputAudio,
   equalizeAudio,
+  equalizeWithAI,
 };

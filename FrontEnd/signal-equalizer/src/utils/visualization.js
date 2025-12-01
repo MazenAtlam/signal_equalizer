@@ -467,6 +467,13 @@ export const drawSpectrogram = (canvas, spectrogramData, sampleRate = 44100, dur
       if (mag > maxMag) maxMag = mag;
     }
   }
+
+  // If all values are the same, create a range to avoid division by zero
+  if (minMag === maxMag) {
+    minMag = minMag - 1;
+    maxMag = maxMag + 1;
+  }
+
   const magRange = maxMag - minMag || 1;
 
   // Calculate cell dimensions
@@ -520,7 +527,7 @@ export const drawSpectrogram = (canvas, spectrogramData, sampleRate = 44100, dur
   ctx.font = '12px Arial';
   ctx.textAlign = 'center';
 
-  // X-axis labels (time)
+  // X-axis labels (time) - show actual time values based on duration
   const timeSteps = 5;
   for (let i = 0; i <= timeSteps; i++) {
     const timeValue = (i / timeSteps) * duration;

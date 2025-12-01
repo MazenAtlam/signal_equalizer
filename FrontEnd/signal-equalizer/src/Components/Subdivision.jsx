@@ -8,7 +8,9 @@ const Subdivision = ({
                        onBandBandwidthChange,
                        onRemoveBand,
                        bandsPosition = "below",
-                       orientation = "vertical",
+                       onDragStart,
+                       frequencyArr,
+                       disabled = false,
                      }) => {
   const [localBands, setLocalBands] = useState([]);
   const [activeBandId, setActiveBandId] = useState(null);
@@ -23,56 +25,40 @@ const Subdivision = ({
     if (bands.length > 0) {
       const bandsWithProperties = bands.map((band, index) => ({
         ...band,
-        position:
-            band.position !== undefined
-                ? band.position
-                : getBandInitialPosition(band.label, index, bands.length),
+        position: band.position !== undefined ? band.position : 50, // Default to center
         bandwidth: band.bandwidth !== undefined ? band.bandwidth : 1,
         row: band.row || 0,
       }));
       setLocalBands(bandsWithProperties);
+    } else {
+      setLocalBands([]);
     }
   }, [bands]);
 
-  // Frequency configuration
-  const frequencies = [
-    { freq: 20, label: "20Hz" },
-    { freq: 30, label: "30Hz" },
-    { freq: 40, label: "40Hz" },
-    { freq: 50, label: "50Hz" },
-    { freq: 60, label: "60Hz" },
-    { freq: 70, label: "70Hz" },
-    { freq: 80, label: "80Hz" },
-    { freq: 90, label: "90Hz" },
-    { freq: 100, label: "100Hz" },
-    { freq: 200, label: "200Hz" },
-    { freq: 300, label: "300Hz" },
-    { freq: 400, label: "400Hz" },
-    { freq: 500, label: "500Hz" },
-    { freq: 600, label: "600Hz" },
-    { freq: 700, label: "700Hz" },
-    { freq: 800, label: "800Hz" },
-    { freq: 900, label: "900Hz" },
-    { freq: 1000, label: "1kHz" },
-    { freq: 2000, label: "2kHz" },
-    { freq: 3000, label: "3kHz" },
-    { freq: 4000, label: "4kHz" },
-    { freq: 5000, label: "5kHz" },
-    { freq: 6000, label: "6kHz" },
-    { freq: 7000, label: "7kHz" },
-    { freq: 8000, label: "8kHz" },
-    { freq: 9000, label: "9kHz" },
-    { freq: 10000, label: "10kHz" },
-    { freq: 15000, label: "15kHz" },
-    { freq: 20000, label: "20kHz" },
-  ];
+  // Calculate dynamic frequency range
+  const getDynamicFrequencyRange = () => {
+    if (!frequencyArr || frequencyArr.length === 0) {
+      return { minFreq: 20, maxFreq: 20000 };
+    }
 
-  const majorFrequencies = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
+    const validFrequencies = frequencyArr.filter(freq =>
+        typeof freq === 'number' && freq > 0 && isFinite(freq)
+    );
 
-  // Frequency conversion functions
+    if (validFrequencies.length === 0) {
+      return { minFreq: 20, maxFreq: 20000 };
+    }
+
+    const minFreq = Math.max(20, Math.min(...validFrequencies));
+    const maxFreq = Math.min(20000, Math.max(...validFrequencies));
+
+    return { minFreq, maxFreq };
+  };
+
+  const { minFreq, maxFreq } = getDynamicFrequencyRange();
+
+  // Update frequency conversion functions to use dynamic range
   const freqToPosition = (freq) => {
-    const minFreq = 20;
-    const maxFreq = 20000;
     const minLog = Math.log10(minFreq);
     const maxLog = Math.log10(maxFreq);
     const freqLog = Math.log10(freq);
@@ -80,20 +66,39 @@ const Subdivision = ({
   };
 
   const positionToFreq = (position) => {
-    const minFreq = 20;
-    const maxFreq = 20000;
     const minLog = Math.log10(minFreq);
     const maxLog = Math.log10(maxFreq);
     const freqLog = minLog + (position / 100) * (maxLog - minLog);
     return Math.pow(10, freqLog);
   };
 
-  // Calculate frequency range for overlap detection
+  // Update frequency markers to use dynamic range
+  const generateFrequencyMarkers = () => {
+    const { minFreq, maxFreq } = getDynamicFrequencyRange();
+
+    // Standard frequency points (logarithmically spaced)
+    const standardFreqs = [20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 15000, 20000];
+
+    // Filter to include only frequencies within our dynamic range
+    const filteredFrequencies = standardFreqs.filter(freq =>
+        freq >= minFreq && freq <= maxFreq
+    );
+
+    return filteredFrequencies.map(freq => ({
+      freq,
+      label: freq < 1000 ? `${freq}Hz` : `${freq/1000}kHz`
+    }));
+  };
+
+  const frequencies = generateFrequencyMarkers();
+  const majorFrequencies = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].filter(
+      freq => freq >= minFreq && freq <= maxFreq
+  );
+
+  // Update calculateFrequencyRange to use dynamic min/max
   const calculateFrequencyRange = (band) => {
     const centerFreq = positionToFreq(band.position);
     const bandwidth = band.bandwidth || 1;
-    const minFreq = 20;
-    const maxFreq = 20000;
     const minLog = Math.log10(minFreq);
     const maxLog = Math.log10(maxFreq);
     const centerLog = Math.log10(centerFreq);
@@ -247,30 +252,10 @@ const Subdivision = ({
     return bandRowMap;
   };
 
-  // Band position initialization
-  const getBandInitialPosition = (bandLabel, index, totalBands) => {
-    const positionMap = {
-      sub: 10,
-      bass: 20,
-      "low-mid": 35,
-      mid: 50,
-      "high-mid": 65,
-      presence: 80,
-      brilliance: 90,
-    };
-
-    const key = bandLabel.toLowerCase().split(" ")[0];
-    const exactPosition = positionMap[key];
-
-    if (exactPosition) {
-      return exactPosition;
-    }
-
-    return (index / Math.max(1, totalBands - 1)) * 80 + 10;
-  };
-
   // Handle band position change
   const handleBandPositionChange = (bandId, newPosition, isActiveModification = false) => {
+    if (disabled) return; // Don't allow changes when disabled
+
     if (isActiveModification) {
       setActiveBandId(bandId);
     }
@@ -288,6 +273,8 @@ const Subdivision = ({
 
   // Handle band gain change
   const handleBandGainChange = (bandId, newValue) => {
+    if (disabled) return; // Don't allow changes when disabled
+
     setLocalBands((prevBands) =>
         prevBands.map((band) =>
             band.id === bandId ? { ...band, value: newValue } : band
@@ -301,6 +288,8 @@ const Subdivision = ({
 
   // Handle band bandwidth change
   const handleBandBandwidthChange = (bandId, newBandwidth, isActiveModification = false) => {
+    if (disabled) return; // Don't allow changes when disabled
+
     if (isActiveModification) {
       setActiveBandId(bandId);
     }
@@ -318,6 +307,8 @@ const Subdivision = ({
 
   // Handle band removal
   const handleRemoveBand = (bandId) => {
+    if (disabled) return; // Don't allow changes when disabled
+
     setLocalBands((prevBands) =>
         prevBands.filter((band) => band.id !== bandId)
     );
@@ -355,6 +346,8 @@ const Subdivision = ({
             borderRadius: "8px",
             padding: "10px",
             border: "1px solid #374151",
+            opacity: disabled ? 0.6 : 1,
+            pointerEvents: disabled ? 'none' : 'auto',
           }}
       >
         {/* Main frequency visualization area */}
@@ -437,6 +430,8 @@ const Subdivision = ({
                   isActive={band.id === activeBandId}
                   rowHeight={ROW_HEIGHT}
                   rowMarginTop={ROW_MARGIN_TOP}
+                  onDragStart={onDragStart}
+                  disabled={disabled}
               />
           ))}
         </div>
