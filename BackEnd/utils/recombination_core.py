@@ -30,8 +30,8 @@ def apply_eq_and_recombine(source_paths, Fs, eq_scheme, UPLOAD_FOLDER):
         # Handle case if Frontend sends a list of objects
         for item in eq_scheme:
             # Adjust keys based on your actual frontend JSON structure
-            label = item.get('name') or item.get('label') 
-            value = item.get('value') or item.get('scale')
+            label = item.get('name')
+            value = item.get('value')
             if label:
                 scale_map[label.lower()] = float(value)
     elif isinstance(eq_scheme, dict):

@@ -50,19 +50,14 @@ def custom_ifft(X):
     """
     Computes the Inverse Discrete Fourier Transform (IDFT) of a 1D spectrum X
     using the custom_fft function.
-    
-    Args:
-        X (np.ndarray): Input frequency spectrum (complex numbers).
-        
-    Returns:
-        np.ndarray: The reconstructed time-domain signal (complex numbers).
     """
     N = len(X)
-    
-    # 1. Take the FFT of the conjugate of the spectrum
+
+    # Take the FFT of the conjugate of the spectrum
     x_n = custom_fft(np.conj(X))
-    
-    # 2. Divide by N and take the conjugate again
+
+    # FIX: Proper normalization for IDFT
+    # The correct IDFT formula is: x[n] = (1/N) * sum_{k=0}^{N-1} X[k] * e^{j2πkn/N}
     return np.conj(x_n) / N
 
 
