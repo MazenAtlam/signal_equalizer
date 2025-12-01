@@ -21,12 +21,19 @@ equalizer_bp = Blueprint('equalizer_bp', __name__)
 # --- Helper to generate common response data (prevents code repetition) ---
 def generate_viz_data(time_series, Fs, fft_data_full):
     # Recalculate visualizations based on the new time series
-    
+
     # 1. Get FFT components for magnitude plot
     frequencies, magnitudes_db, phases = get_fft_components(fft_data_full, Fs)
-    
-    # 2. Compute the new spectrogram
-    spectrogram_matrix = custom_spectrogram(time_series, Fs)
+
+    # 2. Compute the new spectrogram with consistent parameters
+    # FIX: Use the parameters that custom_spectrogram actually accepts
+    spectrogram_matrix = custom_spectrogram(time_series, Fs,
+                                            window_size=1024,  # Use window_size instead of n_fft
+                                            overlap_ratio=0.5)  # 50% overlap (equivalent to hop_length=512)
+
+    # 3. Ensure the time series length matches expected duration
+    expected_duration = len(time_series) / Fs
+    print(f"Generated time series: {len(time_series)} samples, {expected_duration:.2f}s duration")
 
     return {
         'magnitude_arr': magnitudes_db.tolist(),
@@ -45,32 +52,48 @@ def apply_equalizer():
 
     if not signal_id or signal_id not in SIGNAL_CACHE:
         return jsonify({'error': 'Signal ID not found or invalid.'}), 404
-        
-    if not eq_scheme:
-        # If the scheme is empty, we just reconstruct the original signal
-        pass 
 
     signal_data = SIGNAL_CACHE[signal_id]
-    
+
     try:
-        # A. Apply Equalization to the Input FFT (using the new core utility)
+        # Debug: Check original signal properties
+        original_length = len(signal_data['current_signal'])
+        original_duration = original_length / signal_data['Fs']
+        print(f"Original: {original_length} samples, {original_duration:.2f}s")
+
+        # A. Apply Equalization to the Input FFT
         new_fft_data = apply_equalization(
             signal_data['input_fft'], signal_data['Fs'],
             eq_scheme
         )
-        
+
         # B. Inverse FFT (IFFT) to get the new sound wave
         new_time_series_complex = custom_ifft(new_fft_data)
-        
-        # C. Update Cache (The processed signal is now the 'current' signal)
-        # We take the real part as the original time series was real
+
+        # C. Update Cache - take real part and ensure same length
         new_time_series_real = new_time_series_complex.real
+
+        # FIX: Ensure output has same length as input
+        if len(new_time_series_real) != original_length:
+            print(f"WARNING: Length mismatch. Input: {original_length}, Output: {len(new_time_series_real)}")
+            # Truncate or pad to match original length
+            if len(new_time_series_real) > original_length:
+                new_time_series_real = new_time_series_real[:original_length]
+            else:
+                # Pad with zeros if shorter (shouldn't happen with proper FFT)
+                pad_length = original_length - len(new_time_series_real)
+                new_time_series_real = np.pad(new_time_series_real, (0, pad_length), 'constant')
+
         signal_data['current_fft'] = new_fft_data
         signal_data['current_signal'] = new_time_series_real
-        
+
         # D. Generate Visualization Data
         viz_data = generate_viz_data(new_time_series_real, signal_data['Fs'], new_fft_data)
-        
+
+        # Debug output
+        output_duration = len(new_time_series_real) / signal_data['Fs']
+        print(f"Output: {len(new_time_series_real)} samples, {output_duration:.2f}s")
+
         return jsonify({
             'message': 'Equalization applied successfully.',
             'signal_id': signal_id,

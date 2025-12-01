@@ -9,3 +9,5 @@ demucs
 speechbrain
 soundfile
 librosa
+pytorch_lightning
+asteroid

@@ -88,7 +88,7 @@ def _load_voice_model():
         _ensure_model_file_exists()
         
         try:
-            # 2. Fix for PyTorch Lightning (from saif.py)
+            # 2. Fix for PyTorch Lightning
             import pytorch_lightning.callbacks.model_checkpoint
             import pytorch_lightning.callbacks.early_stopping
             torch.serialization.add_safe_globals([
@@ -103,7 +103,7 @@ def _load_voice_model():
                 raise ImportError(f"Could not load spec from {model_path}")
             
             module = importlib.util.module_from_spec(spec)
-            sys.modules["MultiDecoderDPRNN_module"] = module # Optional: cache it
+            sys.modules["MultiDecoderDPRNN_module"] = module 
             spec.loader.exec_module(module)
 
             # Get the class from the loaded module
@@ -187,7 +187,6 @@ def run_demucs_separation(input_filepath, Fs, output_dir):
 def run_speechbrain_separation(input_filepath, Fs, output_dir):
     """
     Runs the MultiDecoderDPRNN model. 
-    Replicates the processing logic from saif.py EXACTLY.
     """
     print(f"Running MultiDecoderDPRNN on {input_filepath}...")
     
