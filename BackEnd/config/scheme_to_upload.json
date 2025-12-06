@@ -1,0 +1,12 @@
+{
+    "sub1": {
+		"start_frequency" : 500,
+		"end_frequency" : 630,
+		"scale_value" : 1
+    },
+    "sub2": {
+        "start_frequency" : 800,
+        "end_frequency" : 1000,
+        "scale_value" : 1
+    }
+}
