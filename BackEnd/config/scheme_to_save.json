@@ -1,0 +1,22 @@
+[
+  {
+    "start_frequency": 169,
+    "end_frequency": 213,
+    "scale_value": 1
+  },
+  {
+    "start_frequency": 800,
+    "end_frequency": 1000,
+    "scale_value": 2.5
+  },
+  {
+    "start_frequency": 551,
+    "end_frequency": 726,
+    "scale_value": 1
+  },
+  {
+    "start_frequency": 551,
+    "end_frequency": 726,
+    "scale_value": 1
+  }
+]

@@ -1,5 +1,7 @@
 import numpy as np
 import custom_fft
+import copy # Ensure copy is imported
+
 def apply_equalization(full_fft_data, Fs, equalization_scheme):
     """
     Applies gain adjustments to the FFT data based on the equalization scheme.
@@ -12,49 +14,86 @@ def apply_equalization(full_fft_data, Fs, equalization_scheme):
         freq_start = band['freq_start_hz']
         freq_end = band['freq_end_hz']
         scale_factor = band['scale_factor']
+        
+        # Handle key inconsistency (frontend sends scale_value, config sends scale_factor)
+        if 'scale_factor' in band:
+            scale_factor = band['scale_factor']
+            
         linear_gain = scale_factor
 
         # Determine the array indices (bins) for the positive frequencies
         k_start = int(np.floor(freq_start / freq_step))
         k_end = int(np.ceil(freq_end / freq_step))
 
-        # Clamp indices to the valid single-sided range (0 to N//2)
+        # Clamp indices to the valid single-sided range
         k_end_max = N // 2
         k_start = max(0, k_start)
         k_end = min(k_end_max, k_end)
+        
+        # Skip invalid ranges
+        if k_start >= k_end:
+            continue
 
-        # Apply gain to the positive frequency components
+        # 1. Apply gain to the positive frequency components
         new_fft_data[k_start:k_end] *= linear_gain
 
-        # FIX: Proper handling of negative frequencies and DC component
-        # For real signals, FFT is symmetric: X[k] = conjugate(X[N-k])
-        # We need to handle different cases based on N (even/odd)
+        # 2. Apply to negative frequencies (Mirroring) based on N parity
         if N % 2 == 0:
-            # Even N: DC (0), positive (1 to N/2-1), Nyquist (N/2), negative (N/2+1 to N-1)
+            # Even N: DC at 0, Nyquist at N/2
+            # Positive: 1 to N/2 - 1
+            # Negative: N/2 + 1 to N - 1
+            # Mirror of index i is N - i
+            
+            # If our range starts at 0 (DC), handle DC separately
             if k_start == 0:
-                # DC component - only apply to k=0, don't mirror
-                pass
-            else:
-                # Apply to negative frequencies (mirror of positive)
-                k_neg_start = N - k_end
-                k_neg_end = N - k_start
+                pass # DC component is usually left alone or handled carefully
+            
+            # --- FIXED LOGIC START ---
+            # We applied gain to [k_start, k_end). The indices are k_start, ..., k_end-1.
+            # We must apply gain to their mirrors: N-k_start, ..., N-(k_end-1).
+            # The mirror range goes backwards from N-k_start to N-k_end+1.
+            # In Python slice notation [start:end], we need:
+            # Start: N - k_end + 1
+            # End:   N - k_start + 1
+            
+            eff_k_start = max(1, k_start) # Don't mirror DC (0) using this formula
+            
+            k_neg_start = N - k_end + 1
+            k_neg_end = N - eff_k_start + 1
+            
+            # Safety clamp
+            k_neg_start = max(N // 2 + 1, k_neg_start)
+            k_neg_end = min(N, k_neg_end)
+            
+            if k_neg_start < k_neg_end:
                 new_fft_data[k_neg_start:k_neg_end] *= linear_gain
+            # --- FIXED LOGIC END ---
 
-                # Handle Nyquist frequency (k = N/2) if it's in our range
-                if k_end == N // 2:
-                    new_fft_data[N // 2] *= linear_gain
+            # Handle Nyquist frequency (k = N/2) if it was included in k_end
+            # If k_end was clamped to N//2, the loop k_start:k_end STOPS before N//2.
+            # So we check the ORIGINAL k_end before clamping or logic to see if it intended to cover Nyquist.
+            # However, simpler check: if the band covers the highest freq, hit Nyquist.
+            if k_end == N // 2:
+                 new_fft_data[N // 2] *= linear_gain
+
         else:
-            # Odd N: DC (0), positive (1 to (N-1)/2), negative ((N+1)/2 to N-1)
+            # Odd N: DC at 0
+            # Positive: 1 to (N-1)/2
+            # Negative: (N+1)/2 to N-1
+            # Mirror of i is N - i
+            
             if k_start == 0:
-                # DC component
-                pass
-            else:
-                k_neg_start = N - k_end + 1
-                k_neg_end = N - k_start + 1
+                pass 
+
+            eff_k_start = max(1, k_start)
+            
+            k_neg_start = N - k_end + 1
+            k_neg_end = N - eff_k_start + 1
+            
+            if k_neg_start < k_neg_end:
                 new_fft_data[k_neg_start:k_neg_end] *= linear_gain
 
     return new_fft_data
-
 
 
 def calculate_static_output(time_series_signal, Fs, frontend_eq_scheme):

@@ -56,7 +56,7 @@ def custom_ifft(X):
     # Take the FFT of the conjugate of the spectrum
     x_n = custom_fft(np.conj(X))
 
-    # FIX: Proper normalization for IDFT
+
     # The correct IDFT formula is: x[n] = (1/N) * sum_{k=0}^{N-1} X[k] * e^{j2πkn/N}
     return np.conj(x_n) / N
 

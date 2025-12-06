@@ -1,0 +1,80 @@
+{
+  "musical": [
+    {
+      "name": "drums",
+      "start_frequency": 6000,
+      "end_frequency": 10000,
+      "scale_value": 1
+    },
+    {
+      "name": "vocals",
+      "start_frequency": 700,
+      "end_frequency": 2000,
+      "scale_value": 2.1658726283482146
+    },
+    {
+      "name": "others",
+      "start_frequency": 223,
+      "end_frequency": 669,
+      "scale_value": 1
+    },
+    {
+      "name": "bass",
+      "start_frequency": 28,
+      "end_frequency": 53,
+      "scale_value": 1
+    }
+  ],
+  "human": [
+    {
+      "name": "speaker_1",
+      "start_frequency": 90,
+      "end_frequency": 1300,
+      "scale_value": 1
+    },
+    {
+      "name": "speaker_2",
+      "start_frequency": 300,
+      "end_frequency": 1700,
+      "scale_value": 1
+    },
+    {
+      "name": "speaker_3",
+      "start_frequency": 700,
+      "end_frequency": 1800,
+      "scale_value": 1
+    },
+    {
+      "name": "speaker_4",
+      "start_frequency": 90,
+      "end_frequency": 500,
+      "scale_value": 1
+    }
+  ],
+  "animal": [
+    {
+      "name": "Dog",
+      "start_frequency": 200,
+      "end_frequency": 800,
+      "scale_value": 1
+    },
+    {
+      "name": "Donkey",
+      "start_frequency": 800,
+      "end_frequency": 3000,
+      "scale_value": 1
+    },
+    {
+      "name": "Elephant",
+      "start_frequency": 3000,
+      "end_frequency": 5000,
+      "scale_value": 1
+    },
+    {
+      "name": "Birds",
+      "start_frequency": 5000,
+      "end_frequency": 8000,
+      "scale_value": 1
+    }
+  ]
+}
